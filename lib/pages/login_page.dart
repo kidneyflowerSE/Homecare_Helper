@@ -6,6 +6,7 @@ import 'package:homecare_helper/data/model/cost_factor.dart';
 import 'package:homecare_helper/data/model/customer.dart';
 import 'package:homecare_helper/data/model/helper.dart';
 import 'package:homecare_helper/data/model/request.dart';
+import 'package:homecare_helper/data/model/request_detail.dart';
 import 'package:homecare_helper/data/model/services.dart';
 import 'package:homecare_helper/data/repository/repository.dart';
 import 'package:homecare_helper/pages/home_page.dart';
@@ -37,6 +38,7 @@ class _LoginPageState extends State<LoginPage>
   List<Services> services = [];
   List<CostFactor> costFactor = [];
   List<Customer> customers = [];
+  List<RequestDetail> requestDetails = [];
 
   String? phoneError;
   String? passwordError;
@@ -48,7 +50,18 @@ class _LoginPageState extends State<LoginPage>
     super.initState();
     loadData();
     setupAnimations();
+    loadRequestDetailData();
     setupFocusListeners();
+  }
+
+  Future<void> loadRequestDetailData() async {
+    var repository = DefaultRepository();
+    var data =
+        await repository.getRequestDetailById('66fb6326368eb798fa90aa2f');
+    setState(() {
+      requestDetails = data ?? [];
+      print(data);
+    });
   }
 
   void setupAnimations() {
@@ -103,7 +116,7 @@ class _LoginPageState extends State<LoginPage>
     } finally {
       setState(() => isLoadingData = false);
     }
-    print("Data loaded: ${helpers.toString()}");
+    // print("Data loaded: ${helpers.toString()}");
   }
 
   String? validatePhone(String value) {
@@ -116,89 +129,69 @@ class _LoginPageState extends State<LoginPage>
     return null;
   }
 
-  // String? validatePassword(String value) {
-  //   if (value.isEmpty) {
-  //     return "Mật khẩu không được để trống";
-  //   }
-  //   return null;
-  // }
+  Future<void> login() async {
+    final phone = phoneController.text.trim();
 
-  // Future<void> login() async {
-  //   final phone = phoneController.text.trim();
-  //   final password = passwordController.text.trim();
+    // Validate phone number
+    setState(() {
+      phoneError = validatePhone(phone);
+    });
 
-  //   setState(() {
-  //     phoneError = validatePhone(phone);
-  //     passwordError = validatePassword(password);
-  //   });
+    if (phoneError != null) return;
 
-  //   if (phoneError != null || passwordError != null) return;
+    setState(() => isLoading = true);
 
-  //   setState(() => isLoading = true);
+    try {
+      // Simulate network delay
+      await Future.delayed(const Duration(seconds: 2));
 
-  //   try {
-  //     await Future.delayed(
-  //         const Duration(seconds: 2)); // Simulate network delay
+      // Check if the phone number matches any helper
+      Helper? matchedHelper;
+      for (var helper in helpers) {
+        if (helper.phone == phone) {
+          matchedHelper = helper;
+          print("Matched helper: ${helper.fullName}");
+          break;
+        } else {
+          print("Not matched");
+        }
+      }
 
-  //     bool isValid = false;
-  //     int customerIndex = 0;
-
-  //     for (int i = 0; i < customers.length; i++) {
-  //       if (customers[i].phone == phone && customers[i].password == password) {
-  //         isValid = true;
-  //         customerIndex = i;
-  //         break;
-  //       }
-  //     }
-
-  //     if (isValid) {
-  //       setState(() {
-  //         isLoginSuccess = true;
-  //       });
-  //       requestsCustomer = requests
-  //           .where((request) =>
-  //               request.customerInfo.fullName == customers[customerIndex].name)
-  //           .toList();
-
-  //       // Future.delayed(const Duration(seconds: 1), () {
-  //       if (mounted) {
-  //         Navigator.pushReplacement(
-  //           context,
-  //           PageRouteBuilder(
-  //             pageBuilder: (context, animation, secondaryAnimation) => HomePage(
-  //               customer: customers[customerIndex],
-  //               requests: requestsCustomer,
-  //               services: services,
-  //               costFactor: costFactor,
-  //             ),
-  //             transitionsBuilder:
-  //                 (context, animation, secondaryAnimation, child) {
-  //               return FadeTransition(
-  //                 opacity: animation,
-  //                 child: child,
-  //               );
-  //             },
-  //             transitionDuration: const Duration(milliseconds: 500),
-  //           ),
-  //         );
-  //       }
-  //     } else {
-  //       setState(
-  //           () => passwordError = "Số điện thoại hoặc mật khẩu không đúng");
-  //     }
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() => isLoading = false);
-  //     }
-  //   }
-  // }
+      if (matchedHelper != null) {
+        // Navigate to the home page with the matched helper's information
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => HomePage(
+              helper: matchedHelper!,
+              services: services,
+              costFactors: [],
+            ),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+      } else {
+        // Show error if no match is found
+        setState(() => phoneError = "Số điện thoại không tồn tại");
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
     phoneController.dispose();
-    passwordController.dispose();
     phoneFocusNode.dispose();
-    passwordFocusNode.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -287,41 +280,12 @@ class _LoginPageState extends State<LoginPage>
                           },
                         ),
 
-                        const SizedBox(height: 15),
-
-                        // Password input
-                        MyTextField(
-                          controller: passwordController,
-                          hintText: "Mật khẩu",
-                          obscureText: true,
-                          keyboardType: TextInputType.text,
-                          errorText: passwordError,
-                          focusNode: passwordFocusNode,
-                          onChanged: (value) {
-                            // if (passwordError != null) {
-                            //   setState(() {
-                            //     passwordError = validatePassword(value);
-                            //   });
-                            // }
-                          },
-                        ),
-
                         const SizedBox(height: 25),
 
                         // Login button
                         MyButton(
                           text: isLoading ? "Đang đăng nhập..." : "Đăng nhập",
-                          // onTap: isLoading ? null : login,
-                          onTap: () {
-                            // Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //         builder: (context) =>  HomePage(
-
-                            //           services: services,
-                            //           costFactors: costFactor,
-                            //         )));
-                          },
+                          onTap: isLoading ? null : login,
                         ),
 
                         const SizedBox(height: 20),

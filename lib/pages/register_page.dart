@@ -84,9 +84,8 @@ class _RegisterPageState extends State<RegisterPage>
       hasError = true;
     } else if (!RegExp(r'^0\d{9}$').hasMatch(phone)) {
       setState(
-        () =>
-            phoneError =
-                "Số điện thoại không hợp lệ. Vui lòng nhập 10 chữ số và bắt đầu bằng số 0.",
+        () => phoneError =
+            "Số điện thoại không hợp lệ. Vui lòng nhập 10 chữ số và bắt đầu bằng số 0.",
       );
       hasError = true;
     }
@@ -313,13 +312,12 @@ class _RegisterPageState extends State<RegisterPage>
                                 ),
                               ),
                               GestureDetector(
-                                onTap:
-                                    () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const LoginPage(),
-                                      ),
-                                    ),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const LoginPage(),
+                                  ),
+                                ),
                                 child: const Text(
                                   " Đăng nhập",
                                   style: TextStyle(

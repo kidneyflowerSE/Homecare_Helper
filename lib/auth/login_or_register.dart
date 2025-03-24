@@ -23,13 +23,15 @@ class _LoginOrRegisterState extends State<LoginOrRegister> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body:
-          showLoginPage
-              ? LoginPage(key: const ValueKey('LoginPage'), onTap: togglePages)
-              : RegisterPage(
-                key: const ValueKey('RegisterPage'),
-                onTap: togglePages,
-              ),
+      body: showLoginPage
+          ? LoginPage(
+              key: const ValueKey('LoginPage'),
+              onTap: togglePages,
+            )
+          : LoginPage(
+              key: const ValueKey('RegisterPage'),
+              onTap: togglePages,
+            ),
     );
   }
 }

@@ -25,6 +25,8 @@ abstract interface class Repository {
 
   Future<List<RequestDetail>?> loadRequestDetail();
 
+  Future<List<RequestDetail>?> getRequestDetailById(String id);
+
   Future<List<RequestDetail>?> loadRequestDetailId(List<String> id);
 
   Future<List<TimeOff>?> loadTimeOff();
@@ -92,6 +94,11 @@ class DefaultRepository implements Repository {
   @override
   Future<List<RequestDetail>?> loadRequestDetail() async {
     return await remoteDataSource.loadRequestDetailData();
+  }
+
+  @override
+  Future<List<RequestDetail>?> getRequestDetailById(String id) async {
+    return await remoteDataSource.getAllRequestDetailOfHelperId(id);
   }
 
   @override

@@ -15,15 +15,16 @@ import 'package:homecare_helper/pages/profile_page.dart';
 import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
 
 class HomePage extends StatefulWidget {
-  final Customer customer;
+  final Helper helper;
   final List<CostFactor> costFactors;
   final List<Services> services;
 
-  const HomePage(
-      {super.key,
-      required this.customer,
-      required this.costFactors,
-      required this.services});
+  const HomePage({
+    super.key,
+    required this.helper,
+    required this.costFactors,
+    required this.services,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -33,92 +34,75 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   final List<Widget> _pages = [];
   List<Requests> requests = [];
-  List<Requests>? requestCustomer = [];
-  List<Helper>? helperList = [];
-  List<Customer>? customerList = [];
-  Timer? _pollingTimer;
-  bool isLoading = true; // Thêm biến để theo dõi trạng thái tải dữ liệu
-
-  Future<void> loadHelperData() async {
-    var repository = DefaultRepository();
-    var data = await repository.loadCleanerData();
-    setState(() {
-      helperList = data ?? [];
-    });
-  }
+  List<Requests>? helperRequests = [];
+  List<Customer> customers = [];
+  List<RequestDetail> requestDetails = [];
+  List<RequestDetail> requestDetailHelper = [];
+  bool isLoading = true;
 
   Future<void> loadRequestData() async {
-    var repository = DefaultRepository();
-    var data = await repository.loadRequest();
-    setState(() {
-      requests = data ?? [];
-      requestCustomer = requests
-          .where((request) =>
-              request.customerInfo.fullName == widget.customer.name)
-          .toList();
-      isLoading = false;
-    });
+    try {
+      var repository = DefaultRepository();
+      var data = await repository.loadRequest();
+      setState(() {
+        requests = data ?? [];
+        helperRequests = requests
+            .where((request) => request.helperId == widget.helper.id)
+            .toList();
+        isLoading = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load requests: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Future<void> loadRequestDetailData() async {
+  //   var repository = DefaultRepository();
+  //   var data =
+  //       await repository.getRequestDetailById('66fb6326368eb798fa90aa2f');
+  //   setState(() {
+  //     requestDetails = data ?? [];
+  //     print(data);
+  //   });
+  // }
+
+  Future<void> loadCustomerData() async {
+    try {
+      var repository = DefaultRepository();
+      var data = await repository.loadCustomer();
+      setState(() {
+        customers = data ?? [];
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to load customers: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   void initState() {
     super.initState();
     loadRequestData();
-    _pages.add(HomeContent(
-      // helper: [],
-      customers: [widget.customer], // Add the customers parameter
-      requests: [
-        Requests(
-          customerInfo: CustomerInfo(
-            fullName: "Nguyễn Văn A",
-            phone: "0123456789",
-            address: "101 Đường Phạm Ngũ Lão, Quận 1",
-            usedPoint: 30,
-          ),
-          service: RequestService(
-            title: "Vệ sinh máy lạnh",
-            coefficientService: 1.8,
-            coefficientOther: 1.2,
-            cost: 350000,
-          ),
-          location: RequestLocation(
-            province: "Hồ Chí Minh",
-            district: "Quận 1",
-            ward: "Phường Phạm Ngũ Lão",
-          ),
-          id: "REQ004823",
-          oderDate: "2025-03-23",
-          scheduleIds: ["SCH006"],
-          startTime: "10:00",
-          endTime: "12:00",
-          requestType: "Đặt lịch",
-          totalCost: 630000,
-          status: "Chờ xác nhận",
-          deleted: false,
-          comment: Comment(
-            review: "",
-            loseThings: false,
-            breakThings: false,
-          ),
-          profit: 210000,
-          helperId: null,
-          startDate: "2025-03-25",
-        ),
-      ],
-      customer: Customer(
-        name: "Nguyễn Văn A",
-        phone: "0123456789",
-        points: [
-          // You might need to create a Point class
-          // or use appropriate data structure here
-        ],
-        email: "nguyenvana@example.com",
-        password: "hashedpassword123",
-        addresses: [],
+    loadCustomerData();
+    // loadRequestDetailData();
+    _pages.add(
+      HomeContent(
+        helper: widget.helper,
+        requests: helperRequests ?? [],
+        customers: customers,
       ),
-    ));
-    _pages.add(HistoryPage());
-    _pages.add(NotificationPage());
+    );
+    _pages.add(const HistoryPage());
+    _pages.add(const NotificationPage());
     _pages.add(ProfilePage());
   }
 
@@ -131,7 +115,11 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex.clamp(0, _pages.length - 1)],
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : _pages[_selectedIndex.clamp(0, _pages.length - 1)],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,

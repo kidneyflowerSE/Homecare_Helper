@@ -4,16 +4,15 @@ import 'package:homecare_helper/data/model/helper.dart';
 import 'package:homecare_helper/data/model/request.dart';
 
 class HomeContent extends StatefulWidget {
-  // final Helper helper;
+  final Helper helper; // Accept Helper object
   final List<Requests> requests;
   final List<Customer> customers;
 
   const HomeContent({
     super.key,
-    // required this.helper,
+    required this.helper,
     required this.requests,
     required this.customers,
-    required Customer customer,
   });
 
   @override
@@ -31,12 +30,13 @@ class _HomeContentState extends State<HomeContent> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter requests based on selected status
+    // Filter requests assigned to the logged-in helper
+    List<Requests> helperRequests = widget.requests;
+    print(helperRequests.length);
+    // Further filter requests based on selected status
     List<Requests> filteredRequests = _selectedStatus == "Tất cả"
-        ? widget.requests
-        : widget.requests
-            .where((req) => req.status == _selectedStatus)
-            .toList();
+        ? helperRequests
+        : helperRequests.where((req) => req.status == _selectedStatus).toList();
 
     return SafeArea(
       child: Container(
@@ -45,12 +45,12 @@ class _HomeContentState extends State<HomeContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with greeting and user info
+            // Header with greeting and helper info
             Row(
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundImage: AssetImage('lib/images/staff/anhhuy.jpg'),
+                  backgroundImage: NetworkImage('${widget.helper.avatar}'),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -66,8 +66,7 @@ class _HomeContentState extends State<HomeContent> {
                         ),
                       ),
                       Text(
-                        // widget.helper.fullName ?? "Người dùng",
-                        'Anh Huy',
+                        '${widget.helper.fullName}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -105,9 +104,7 @@ class _HomeContentState extends State<HomeContent> {
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
-
             // Summary cards
             Row(
               children: [
@@ -116,7 +113,7 @@ class _HomeContentState extends State<HomeContent> {
                     icon: Icons.work,
                     color: Colors.blue,
                     title: "Công việc hôm nay",
-                    value: _countTodayJobs().toString(),
+                    value: _countTodayJobs(helperRequests).toString(),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -125,14 +122,12 @@ class _HomeContentState extends State<HomeContent> {
                     icon: Icons.monetization_on,
                     color: Colors.green,
                     title: "Thu nhập tháng",
-                    value: _calculateMonthlyIncome(),
+                    value: _calculateMonthlyIncome(helperRequests),
                   ),
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
-
             // Filter chips
             const Text(
               "Yêu cầu công việc tuần này",
@@ -143,7 +138,6 @@ class _HomeContentState extends State<HomeContent> {
               ),
             ),
             const SizedBox(height: 12),
-
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -171,9 +165,7 @@ class _HomeContentState extends State<HomeContent> {
                 }).toList(),
               ),
             ),
-
             const SizedBox(height: 16),
-
             // Job listings
             Expanded(
               child: filteredRequests.isEmpty
@@ -193,21 +185,21 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   // Count jobs scheduled for today
-  int _countTodayJobs() {
+  int _countTodayJobs(List<Requests> requests) {
     final today = DateTime.now().toString().split(' ')[0]; // Get YYYY-MM-DD
-    return widget.requests
+    return requests
         .where((req) => req.startDate?.contains(today) ?? false)
         .length;
   }
 
   // Calculate monthly income from job profits
-  String _calculateMonthlyIncome() {
+  String _calculateMonthlyIncome(List<Requests> requests) {
     final now = DateTime.now();
     final currentMonth = now.month;
     final currentYear = now.year;
-
     int totalIncome = 0;
-    for (var req in widget.requests) {
+
+    for (var req in requests) {
       if (req.profit != null && req.startDate != null) {
         try {
           final date = DateTime.parse(req.startDate!);
@@ -234,6 +226,7 @@ class _HomeContentState extends State<HomeContent> {
             size: 64,
             color: Colors.grey[400],
           ),
+          Text('${widget.requests.length}'),
           const SizedBox(height: 16),
           Text(
             "Không có yêu cầu nào",
@@ -319,7 +312,6 @@ class _HomeContentState extends State<HomeContent> {
   Widget _buildJobCard(Requests request) {
     // Get job status
     String status = request.status;
-
     // Define status color
     Color statusColor;
     if (status == "Chờ xác nhận") {
@@ -340,9 +332,7 @@ class _HomeContentState extends State<HomeContent> {
     if (request.startDate != null) {
       try {
         final dateTime = DateTime.parse(request.startDate!);
-        // date = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
         date = '${dateTime.day}/${dateTime.month}';
-        // time = '${dateTime.hour}:${dateTime.minute}';
       } catch (e) {
         // Use default if date can't be parsed
       }
@@ -394,9 +384,7 @@ class _HomeContentState extends State<HomeContent> {
                         ),
                       ),
                       Text(
-                        // "ID: ${request.id.substring(0, 8)}", // Show first 8 chars of ID
-                        '${price}',
-
+                        price,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -427,9 +415,7 @@ class _HomeContentState extends State<HomeContent> {
               ],
             ),
           ),
-
           Divider(height: 1, color: Colors.grey[200]),
-
           // Job details
           Padding(
             padding: const EdgeInsets.all(16),
@@ -443,10 +429,7 @@ class _HomeContentState extends State<HomeContent> {
                 const SizedBox(height: 8),
                 _buildDetailRow(Icons.location_city,
                     "${request.location.ward}, ${request.location.district}, ${request.location.province}"),
-                // const SizedBox(height: 8),
-                // _buildDetailRow(Icons.calendar_today, date),
                 const SizedBox(height: 8),
-                // _buildDetailRow(Icons.access_time, time),
                 Row(
                   children: [
                     Icon(
@@ -470,7 +453,6 @@ class _HomeContentState extends State<HomeContent> {
               ],
             ),
           ),
-
           // Action buttons
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -627,7 +609,7 @@ class _HomeContentState extends State<HomeContent> {
                     fontFamily: 'Quicksand',
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   'Dịch vụ: ${request.service.title}',
                   style: TextStyle(
@@ -675,10 +657,7 @@ class _HomeContentState extends State<HomeContent> {
               ),
               onPressed: () {
                 // Handle job rejection logic here
-                // For example: updateRequestStatus(request.id, 'Đã từ chối');
                 Navigator.of(context).pop();
-
-                // Show a success snackbar
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -686,7 +665,7 @@ class _HomeContentState extends State<HomeContent> {
                       style: TextStyle(fontFamily: 'Quicksand'),
                     ),
                     backgroundColor: Colors.red[700],
-                    duration: Duration(seconds: 2),
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               },
@@ -697,7 +676,6 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  // Show confirmation dialog for accepting a job
   Future<void> _showAcceptConfirmationDialog(Requests request) async {
     return showDialog<void>(
       context: context,
@@ -725,7 +703,7 @@ class _HomeContentState extends State<HomeContent> {
                     fontFamily: 'Quicksand',
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   'Dịch vụ: ${request.service.title}',
                   style: TextStyle(
@@ -795,10 +773,7 @@ class _HomeContentState extends State<HomeContent> {
               ),
               onPressed: () {
                 // Handle job acceptance logic here
-                // For example: updateRequestStatus(request.id, 'Đã nhận');
                 Navigator.of(context).pop();
-
-                // Show a success snackbar
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -806,7 +781,7 @@ class _HomeContentState extends State<HomeContent> {
                       style: TextStyle(fontFamily: 'Quicksand'),
                     ),
                     backgroundColor: Colors.green[700],
-                    duration: Duration(seconds: 2),
+                    duration: const Duration(seconds: 2),
                   ),
                 );
               },

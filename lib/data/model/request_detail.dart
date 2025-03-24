@@ -35,7 +35,9 @@ class RequestDetail {
   factory RequestDetail.fromJson(Map<String, dynamic> map) {
     return RequestDetail(
       id: map['_id'],
-      helperCost: map['helper_cost'],
+      helperCost: map['helper_cost'] is double
+          ? map['helper_cost'].toInt() // Convert double to int
+          : map['helper_cost'], // Use as int if already int
       helperID: map['helper_id'],
       status: map['status'],
       workingDate: map['workingDate'],

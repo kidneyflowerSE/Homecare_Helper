@@ -29,6 +29,8 @@ abstract interface class DataSource {
 
   Future<List<RequestDetail>?> loadRequestDetailData();
 
+  Future<List<RequestDetail>?> getAllRequestDetailOfHelperId(String id);
+
   Future<void> sendRequests(Requests requests);
 
   Future<void> cancelRequest(String id);
@@ -220,6 +222,44 @@ class RemoteDataSource implements DataSource {
     } catch (e) {
       print('Error loading request detail data: $e');
       return null;
+    }
+  }
+
+  Future<List<RequestDetail>> getAllRequestDetailOfHelperId(String id) async {
+    // Validate input
+    if (id.isEmpty) {
+      throw ArgumentError('The ID cannot be empty.');
+    }
+
+    // Construct the URL with the provided ID
+    String url = 'https://api.homekare.site/requestdetail/helper/$id';
+
+    final uri = Uri.parse(url);
+
+    try {
+      // Perform the HTTP GET request
+      final response = await http.get(uri);
+
+      // Check for successful response
+      if (response.statusCode == 200) {
+        // Decode the JSON response
+        final List<dynamic> detailsList = jsonDecode(response.body);
+
+        // Map the JSON data to RequestDetail objects
+        return detailsList
+            .map((detail) => RequestDetail.fromJson(detail))
+            .toList();
+      } else {
+        // Handle non-200 status codes
+        print(
+            'Failed to load request details. Status code: ${response.statusCode}');
+        throw Exception(
+            'Failed to load request details. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Handle exceptions
+      print('Error loading request details: $e');
+      throw Exception('Error loading request details: $e');
     }
   }
 
