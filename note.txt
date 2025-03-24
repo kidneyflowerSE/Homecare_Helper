@@ -1,0 +1,34 @@
+children: [
+                _buildDetailRow(Icons.person,
+                    "Khách hàng: ${request.customerInfo.fullName}"),
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                    Icons.phone, "Điện thoại: ${request.customerInfo.phone}"),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.location_city,
+                    "${request.location.ward}, ${request.location.district}, ${request.location.province}"),
+                // const SizedBox(height: 8),
+                // _buildDetailRow(Icons.calendar_today, date),
+                const SizedBox(height: 8),
+                // _buildDetailRow(Icons.access_time, time),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "Ngày bắt đầu: ${date}",
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 15,
+                        fontFamily: 'Quicksand',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('lúc ${time}'),
+                  ],
+                ),
+              ],
