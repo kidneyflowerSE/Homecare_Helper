@@ -431,7 +431,8 @@ class _HomeContentState extends State<HomeContent> {
                     "${request.location.ward}, ${request.location.district}, ${request.location.province}"),
                 const SizedBox(height: 8),
                 SingleChildScrollView(
-                  scrollDirection: Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
+                  scrollDirection:
+                      Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
                   child: Row(
                     children: [
                       Icon(
@@ -452,108 +453,104 @@ class _HomeContentState extends State<HomeContent> {
                       Text('lúc $time'),
                     ],
                   ),
-                )
-              ],
-            ),
-          ),
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                if (status == "Chờ xác nhận") ...[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        _showRejectConfirmationDialog(request);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(color: Colors.red),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                ),
+                Row(
+                  children: [
+                    if (status == "notDone") ...[
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            _showRejectConfirmationDialog(request);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            "Từ chối",
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontFamily: 'Quicksand',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        "Từ chối",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontFamily: 'Quicksand',
-                          fontWeight: FontWeight.bold,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _showAcceptConfirmationDialog(request);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: Colors.green,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            "Nhận việc",
+                            style: TextStyle(
+                              fontFamily: 'Quicksand',
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _showAcceptConfirmationDialog(request);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    ] else if (status == "assigned") ...[
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Handle start work
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: Colors.blue,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            "Bắt đầu làm việc",
+                            style: TextStyle(
+                              fontFamily: 'Quicksand',
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        "Nhận việc",
-                        style: TextStyle(
-                          fontFamily: 'Quicksand',
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                    ] else if (status == "Đang thực hiện") ...[
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Handle finish work
+                          },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: Colors.green,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            "Hoàn thành",
+                            style: TextStyle(
+                              fontFamily: 'Quicksand',
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ] else if (status == "Đã nhận") ...[
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Handle start work
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        "Bắt đầu làm việc",
-                        style: TextStyle(
-                          fontFamily: 'Quicksand',
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ] else if (status == "Đang thực hiện") ...[
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // Handle finish work
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text(
-                        "Hoàn thành",
-                        style: TextStyle(
-                          fontFamily: 'Quicksand',
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
