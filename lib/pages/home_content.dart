@@ -32,7 +32,7 @@ class _HomeContentState extends State<HomeContent> {
   Widget build(BuildContext context) {
     // Filter requests assigned to the logged-in helper
     List<Requests> helperRequests = widget.requests;
-    print(helperRequests.length);
+    print("độ dài: ${helperRequests.length}");
     // Further filter requests based on selected status
     List<Requests> filteredRequests = _selectedStatus == "Tất cả"
         ? helperRequests
@@ -108,7 +108,7 @@ class _HomeContentState extends State<HomeContent> {
             // Summary cards
             Row(
               children: [
-                Expanded(
+                Flexible(
                   child: _buildSummaryCard(
                     icon: Icons.work,
                     color: Colors.blue,
@@ -117,7 +117,7 @@ class _HomeContentState extends State<HomeContent> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Expanded(
+                Flexible(
                   child: _buildSummaryCard(
                     icon: Icons.monetization_on,
                     color: Colors.green,
@@ -140,7 +140,7 @@ class _HomeContentState extends State<HomeContent> {
             const SizedBox(height: 12),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: Row(
+              child: Wrap(
                 children: _statusFilters.map((status) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
@@ -430,26 +430,29 @@ class _HomeContentState extends State<HomeContent> {
                 _buildDetailRow(Icons.location_city,
                     "${request.location.ward}, ${request.location.district}, ${request.location.province}"),
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "Ngày bắt đầu: ${date}",
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 15,
-                        fontFamily: 'Quicksand',
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Colors.grey[600],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('lúc ${time}'),
-                  ],
-                ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Ngày bắt đầu: $date",
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 15,
+                          fontFamily: 'Quicksand',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('lúc $time'),
+                    ],
+                  ),
+                )
               ],
             ),
           ),

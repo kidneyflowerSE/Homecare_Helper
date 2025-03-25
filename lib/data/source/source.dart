@@ -225,41 +225,26 @@ class RemoteDataSource implements DataSource {
     }
   }
 
-  Future<List<RequestDetail>> getAllRequestDetailOfHelperId(String id) async {
-    // Validate input
-    if (id.isEmpty) {
-      throw ArgumentError('The ID cannot be empty.');
-    }
-
-    // Construct the URL with the provided ID
+  @override
+  Future<List<RequestDetail>?> getAllRequestDetailOfHelperId(String id) async {
     String url = 'https://api.homekare.site/requestdetail/helper/$id';
-
     final uri = Uri.parse(url);
-
     try {
-      // Perform the HTTP GET request
       final response = await http.get(uri);
-
-      // Check for successful response
       if (response.statusCode == 200) {
-        // Decode the JSON response
-        final List<dynamic> detailsList = jsonDecode(response.body);
-
-        // Map the JSON data to RequestDetail objects
+        final bodyContent = utf8.decode(response.bodyBytes);
+        final List<dynamic> detailsList = jsonDecode(bodyContent);
         return detailsList
             .map((detail) => RequestDetail.fromJson(detail))
             .toList();
       } else {
-        // Handle non-200 status codes
         print(
-            'Failed to load request details. Status code: ${response.statusCode}');
-        throw Exception(
-            'Failed to load request details. Status code: ${response.statusCode}');
+            'Failed to load request detail IDs. Status code: ${response.statusCode}');
+        return null;
       }
     } catch (e) {
-      // Handle exceptions
-      print('Error loading request details: $e');
-      throw Exception('Error loading request details: $e');
+      print('Error loading request detail IDs: $e');
+      return null;
     }
   }
 

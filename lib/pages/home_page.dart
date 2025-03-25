@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:homecare_helper/data/model/cost_factor.dart';
 import 'package:homecare_helper/data/model/customer.dart';
@@ -32,78 +31,48 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  final List<Widget> _pages = [];
   List<Requests> requests = [];
-  List<Requests>? helperRequests = [];
+  List<Requests> helperRequests = [];
   List<Customer> customers = [];
   List<RequestDetail> requestDetails = [];
-  List<RequestDetail> requestDetailHelper = [];
   bool isLoading = true;
 
-  Future<void> loadRequestData() async {
+  Future<void> loadData() async {
     try {
       var repository = DefaultRepository();
-      var data = await repository.loadRequest();
+
+      var fetchedRequests = await repository.loadRequest();
+      var fetchedCustomers = await repository.loadCustomer();
+      var fetchedRequestDetails = await repository.getRequestDetailById(widget.helper.id);
+
       setState(() {
-        requests = data ?? [];
-        helperRequests = requests
-            .where((request) => request.helperId == widget.helper.id)
-            .toList();
+        requests = fetchedRequests ?? [];
+        customers = fetchedCustomers ?? [];
+        requestDetails = fetchedRequestDetails ?? [];
+        updateHelperRequests();
         isLoading = false;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to load requests: $e'),
+          content: Text('Lỗi tải dữ liệu: $e'),
           backgroundColor: Colors.red,
         ),
       );
     }
   }
 
-  // Future<void> loadRequestDetailData() async {
-  //   var repository = DefaultRepository();
-  //   var data =
-  //       await repository.getRequestDetailById('66fb6326368eb798fa90aa2f');
-  //   setState(() {
-  //     requestDetails = data ?? [];
-  //     print(data);
-  //   });
-  // }
-
-  Future<void> loadCustomerData() async {
-    try {
-      var repository = DefaultRepository();
-      var data = await repository.loadCustomer();
-      setState(() {
-        customers = data ?? [];
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load customers: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  void updateHelperRequests() {
+    helperRequests = requests.where((request) =>
+        request.scheduleIds.any((scheduleId) =>
+            requestDetails.any((requestDetail) => requestDetail.id == scheduleId))
+    ).toList();
   }
 
   @override
   void initState() {
     super.initState();
-    loadRequestData();
-    loadCustomerData();
-    // loadRequestDetailData();
-    _pages.add(
-      HomeContent(
-        helper: widget.helper,
-        requests: helperRequests ?? [],
-        customers: customers,
-      ),
-    );
-    _pages.add(const HistoryPage());
-    _pages.add(const NotificationPage());
-    _pages.add(ProfilePage());
+    loadData();
   }
 
   void _onItemTapped(int index) {
@@ -114,12 +83,23 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    updateHelperRequests(); // Đảm bảo helperRequests luôn được cập nhật
+
+    final List<Widget> pages = [
+      HomeContent(
+        helper: widget.helper,
+        requests: helperRequests,
+        customers: customers,
+      ),
+      const HistoryPage(),
+      const NotificationPage(),
+      ProfilePage(),
+    ];
+
     return Scaffold(
       body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : _pages[_selectedIndex.clamp(0, _pages.length - 1)],
+          ? const Center(child: CircularProgressIndicator())
+          : pages[_selectedIndex.clamp(0, pages.length - 1)],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,

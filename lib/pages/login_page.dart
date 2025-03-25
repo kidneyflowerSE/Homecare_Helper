@@ -60,7 +60,6 @@ class _LoginPageState extends State<LoginPage>
         await repository.getRequestDetailById('66fb6326368eb798fa90aa2f');
     setState(() {
       requestDetails = data ?? [];
-      print(data);
     });
   }
 
@@ -198,6 +197,7 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
+    print(requestDetails);
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: Colors.white,
