@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:homecare_helper/data/model/customer.dart';
 import 'package:homecare_helper/data/model/helper.dart';
 import 'package:homecare_helper/data/model/request.dart';
+import 'package:homecare_helper/data/repository/repository.dart';
 
 class HomeContent extends StatefulWidget {
   final Helper helper; // Accept Helper object
@@ -27,6 +30,47 @@ class _HomeContentState extends State<HomeContent> {
     "Đã nhận",
     "Đang thực hiện"
   ];
+
+  Future<void> assignedRequest(Requests request) async{
+    var repository = DefaultRepository();
+    await repository.remoteDataSource.assignedRequest(request.scheduleIds.first);
+    setState(() {
+      request.status = 'assigned';
+    });
+  }
+
+  Future<void> processingRequest(Requests request) async{
+    var repository = DefaultRepository();
+    await repository.remoteDataSource.processingRequest(request.scheduleIds.first);
+    setState(() {
+      request.status = 'processing';
+    });
+  }
+
+  Future<void> finishRequest(Requests request) async{
+    var repository = DefaultRepository();
+    await repository.remoteDataSource.finishRequest(request.scheduleIds.first);
+    setState(() {
+      request.status = 'waitPayment';
+    });
+  }
+
+  Future<void> finishPayment(Requests request) async{
+    var repository = DefaultRepository();
+    await repository.remoteDataSource.finishPayment(request.scheduleIds.first);
+    setState(() {
+      request.status = 'done';
+    });
+  }
+
+  Future<void> cancelRequest(Requests request) async{
+    var repository = DefaultRepository();
+    await repository.remoteDataSource.cancelRequest(request.id);
+    print("thông tin huỷ request $request");
+    setState(() {
+      request.status = 'cancelled';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +550,7 @@ class _HomeContentState extends State<HomeContent> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            // Handle start work
+                            processingRequest(request);
                           },
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -637,7 +681,7 @@ class _HomeContentState extends State<HomeContent> {
                 ),
               ),
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(context).pop;
               },
             ),
             ElevatedButton(
@@ -656,7 +700,8 @@ class _HomeContentState extends State<HomeContent> {
                 ),
               ),
               onPressed: () {
-                // Handle job rejection logic here
+                //Handle job rejection logic here
+                cancelRequest(request);
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -773,7 +818,7 @@ class _HomeContentState extends State<HomeContent> {
               ),
               onPressed: () {
                 // Handle job acceptance logic here
-                Navigator.of(context).pop();
+                assignedRequest(request);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(

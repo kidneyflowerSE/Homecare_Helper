@@ -37,6 +37,12 @@ abstract interface class DataSource {
 
   Future<void> finishRequest(String id);
 
+  Future<void> assignedRequest(String id);
+
+  Future<void> processingRequest(String id);
+
+  Future<void> finishPayment(String id);
+
   Future<List<TimeOff>?> loadTimeOffData();
 
   Future<List<Message>?> loadMessageData(Message message);
@@ -365,6 +371,28 @@ class RemoteDataSource implements DataSource {
   }
 
   @override
+  Future<void> assignedRequest(String id) async {
+    final url = 'https://api.homekare.site/request/assigned';
+    final uri = Uri.parse(url);
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({'id': id});
+    try {
+      final response = await http.post(uri, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          print('Cancel request posted successfully!');
+        }
+      } else {
+        print('Failed to post requests. Status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
+    } catch (e) {
+      print('Error posting requests: $e');
+    }
+  }
+
+  @override
   Future<List<Message>?> loadMessageData(Message message) async {
     final url =
         Uri.parse('https://api.homekare.site/message?phone=${message.phone}');
@@ -547,6 +575,50 @@ class RemoteDataSource implements DataSource {
       if (response.statusCode == 200) {
         if (kDebugMode) {
           print('Requests posted successfully!');
+        }
+      } else {
+        print('Failed to post requests. Status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
+    } catch (e) {
+      print('Error posting requests: $e');
+    }
+  }
+
+  @override
+  Future<void> finishPayment(String id) async {
+    final url = 'https://api.homekare.site/request/finishpayment';
+    final uri = Uri.parse(url);
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({'detailId': id});
+    try {
+      final response = await http.post(uri, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          print('Done request posted successfully!');
+        }
+      } else {
+        print('Failed to post requests. Status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
+    } catch (e) {
+      print('Error posting requests: $e');
+    }
+  }
+
+  @override
+  Future<void> processingRequest(String id) async {
+    final url = 'https://api.homekare.site/request/processing';
+    final uri = Uri.parse(url);
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({'detailId': id});
+    try {
+      final response = await http.post(uri, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          print('Done request posted successfully!');
         }
       } else {
         print('Failed to post requests. Status code: ${response.statusCode}');

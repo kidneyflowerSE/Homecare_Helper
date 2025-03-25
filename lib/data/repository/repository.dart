@@ -35,7 +35,13 @@ abstract interface class Repository {
 
   Future<void> canceledRequest(String id);
 
+  Future<void> assignedRequest(String id);
+
+  Future<void> processingRequest(String id);
+
   Future<void> doneConfirmRequest(String id);
+
+  Future<void> finishPayment(String id);
 
   Future<void> sendMessage(String phone);
 
@@ -166,5 +172,20 @@ class DefaultRepository implements Repository {
   @override
   Future<void> sendCustomerRegisterRequest(Customer customer) async {
     return await remoteDataSource.sendCustomerRegisterRequest(customer);
+  }
+
+  @override
+  Future<void> assignedRequest(String id) async{
+    return await remoteDataSource.assignedRequest(id);
+  }
+
+  @override
+  Future<void> finishPayment(String id) async {
+    return await remoteDataSource.finishPayment(id);
+  }
+
+  @override
+  Future<void> processingRequest(String id) async {
+    return await remoteDataSource.processingRequest(id);
   }
 }
