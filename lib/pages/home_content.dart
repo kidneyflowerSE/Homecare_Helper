@@ -200,7 +200,7 @@ class _HomeContentState extends State<HomeContent> {
     int totalIncome = 0;
 
     for (var req in requests) {
-      if (req.profit != null && req.startDate != null) {
+      if (req.startDate != null) {
         try {
           final date = DateTime.parse(req.startDate!);
           if (date.month == currentMonth && date.year == currentYear) {
