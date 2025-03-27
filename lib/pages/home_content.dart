@@ -7,16 +7,17 @@ import 'package:homecare_helper/data/model/request.dart';
 import 'package:homecare_helper/data/repository/repository.dart';
 
 class HomeContent extends StatefulWidget {
-  final Helper helper; // Accept Helper object
+  final Helper helper;
   final List<Requests> requests;
   final List<Customer> customers;
+  final Future<void> Function() refreshData;
 
   const HomeContent({
-    super.key,
+    Key? key,
     required this.helper,
     required this.requests,
-    required this.customers,
-  });
+    required this.customers, required this.refreshData,
+  }): super(key:key);
 
   @override
   State<HomeContent> createState() => _HomeContentState();
@@ -24,6 +25,8 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent> {
   String _selectedStatus = "notDone";
+  Key  pageKey = UniqueKey();
+
   final List<String> _statusFilters = [
     "notDone",
     "assigned",
@@ -208,7 +211,7 @@ class _HomeContentState extends State<HomeContent> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: FilterChip(
-                      label: Text('${getVietNameseStatus(status)}'),
+                      label: Text(getVietNameseStatus(status)),
                       labelStyle: TextStyle(
                         color: _selectedStatus == status
                             ? Colors.green
@@ -231,15 +234,27 @@ class _HomeContentState extends State<HomeContent> {
             const SizedBox(height: 16),
             // Job listings
             Expanded(
-              child: filteredRequests.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      itemCount: filteredRequests.length,
-                      itemBuilder: (context, index) {
-                        final request = filteredRequests[index];
-                        return _buildJobCard(request);
-                      },
-                    ),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await widget.refreshData();
+                  setState(() {
+                    pageKey = UniqueKey(); // Thay đổi key để cập nhật lại UI
+                  });
+                },
+                child: KeyedSubtree(
+                  key: pageKey,
+                  child: filteredRequests.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                    key: const PageStorageKey<String>('job_list'),
+                    itemCount: filteredRequests.length,
+                    itemBuilder: (context, index) {
+                      final request = filteredRequests[index];
+                      return _buildJobCard(request);
+                    },
+                  ),
+                ),
+              ),
             ),
           ],
         ),

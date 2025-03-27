@@ -51,6 +51,7 @@ class _HomePageState extends State<HomePage> {
         requestDetails = fetchedRequestDetails ?? [];
         updateHelperRequests();
         isLoading = false;
+        print('cập nhật lại dữ liệu');
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,6 +88,7 @@ class _HomePageState extends State<HomePage> {
 
     final List<Widget> pages = [
       HomeContent(
+        refreshData: loadData,
         helper: widget.helper,
         requests: helperRequests,
         customers: customers,
