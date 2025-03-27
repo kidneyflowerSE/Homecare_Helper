@@ -96,6 +96,7 @@ flutter:
   assets:
     - lib/images/logo2.png
     - lib/images/logo.png
+    - lib/images/logohelper.png
     - lib/images/background.png
     - lib/images/banner_1.png
     - lib/images/banner_2.png

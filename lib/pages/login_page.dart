@@ -222,7 +222,7 @@ class _LoginPageState extends State<LoginPage>
                         Hero(
                           tag: 'app_logo',
                           child: Image.asset(
-                            'lib/images/logo.png',
+                            'lib/images/logohelper.png',
                             width: 180,
                             height: 180,
                           ),

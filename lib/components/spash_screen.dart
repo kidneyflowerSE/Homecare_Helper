@@ -26,23 +26,23 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..addListener(() {
-      final int currentLength =
-          (_typingController.value * _fullText.length).floor();
-      setState(() {
-        _displayedText = _fullText.substring(0, currentLength);
+        final int currentLength =
+            (_typingController.value * _fullText.length).floor();
+        setState(() {
+          _displayedText = _fullText.substring(0, currentLength);
+        });
       });
-    });
 
     // AnimationController cho dấu ba chấm lặp lại
     _dotsController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
     )..addListener(() {
-      final int dotCount = ((_dotsController.value * 3).floor() % 4);
-      setState(() {
-        _dots = "." * dotCount;
+        final int dotCount = ((_dotsController.value * 3).floor() % 4);
+        setState(() {
+          _dots = "." * dotCount;
+        });
       });
-    });
 
     _typingController.forward().then((_) {
       _dotsController.repeat();
@@ -55,9 +55,8 @@ class _SplashScreenState extends State<SplashScreen>
   void _navigateToLoginPage() {
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder:
-            (context, animation, secondaryAnimation) =>
-                LoginOrRegister(key: const ValueKey("LoginOrRegister")),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            LoginOrRegister(key: const ValueKey("LoginOrRegister")),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
@@ -82,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen>
           children: [
             // Logo
             Image.asset(
-              'lib/images/logo.png',
+              'lib/images/logohelper.png',
               width: MediaQuery.of(context).size.width * 0.6,
               fit: BoxFit.contain,
             ),

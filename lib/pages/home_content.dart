@@ -23,31 +23,51 @@ class HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<HomeContent> {
-  String _selectedStatus = "Tất cả";
+  String _selectedStatus = "notDone";
   final List<String> _statusFilters = [
-    "Tất cả",
-    "Chờ xác nhận",
-    "Đã nhận",
-    "Đang thực hiện"
+    "notDone",
+    "assigned",
+    "processing",
+    "waitPayment",
+    "done",
   ];
 
-  Future<void> assignedRequest(Requests request) async{
+  String getVietNameseStatus(String status) {
+    switch (status) {
+      case "notDone":
+        return "Chờ xác nhận";
+      case "assigned":
+        return "Đã nhận việc";
+      case "processing":
+        return "Đang tiến hành";
+      case "waitPayment":
+        return "Chờ thanh toán";
+      case "done":
+        return "Hoàn thành";
+      default:
+        return "Không xác định";
+    }
+  }
+
+  Future<void> assignedRequest(Requests request) async {
     var repository = DefaultRepository();
-    await repository.remoteDataSource.assignedRequest(request.scheduleIds.first);
+    await repository.remoteDataSource
+        .assignedRequest(request.scheduleIds.first);
     setState(() {
       request.status = 'assigned';
     });
   }
 
-  Future<void> processingRequest(Requests request) async{
+  Future<void> processingRequest(Requests request) async {
     var repository = DefaultRepository();
-    await repository.remoteDataSource.processingRequest(request.scheduleIds.first);
+    await repository.remoteDataSource
+        .processingRequest(request.scheduleIds.first);
     setState(() {
       request.status = 'processing';
     });
   }
 
-  Future<void> finishRequest(Requests request) async{
+  Future<void> finishRequest(Requests request) async {
     var repository = DefaultRepository();
     await repository.remoteDataSource.finishRequest(request.scheduleIds.first);
     setState(() {
@@ -55,7 +75,7 @@ class _HomeContentState extends State<HomeContent> {
     });
   }
 
-  Future<void> finishPayment(Requests request) async{
+  Future<void> finishPayment(Requests request) async {
     var repository = DefaultRepository();
     await repository.remoteDataSource.finishPayment(request.scheduleIds.first);
     setState(() {
@@ -63,7 +83,7 @@ class _HomeContentState extends State<HomeContent> {
     });
   }
 
-  Future<void> cancelRequest(Requests request) async{
+  Future<void> cancelRequest(Requests request) async {
     var repository = DefaultRepository();
     await repository.remoteDataSource.cancelRequest(request.id);
     print("thông tin huỷ request $request");
@@ -76,11 +96,10 @@ class _HomeContentState extends State<HomeContent> {
   Widget build(BuildContext context) {
     // Filter requests assigned to the logged-in helper
     List<Requests> helperRequests = widget.requests;
-    print("độ dài: ${helperRequests.length}");
+    // print("độ dài: ${helperRequests.length}");
     // Further filter requests based on selected status
-    List<Requests> filteredRequests = _selectedStatus == "Tất cả"
-        ? helperRequests
-        : helperRequests.where((req) => req.status == _selectedStatus).toList();
+    List<Requests> filteredRequests =
+        helperRequests.where((req) => req.status == _selectedStatus).toList();
 
     return SafeArea(
       child: Container(
@@ -189,7 +208,7 @@ class _HomeContentState extends State<HomeContent> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: FilterChip(
-                      label: Text(status),
+                      label: Text('${getVietNameseStatus(status)}'),
                       labelStyle: TextStyle(
                         color: _selectedStatus == status
                             ? Colors.green
@@ -358,27 +377,49 @@ class _HomeContentState extends State<HomeContent> {
     String status = request.status;
     // Define status color
     Color statusColor;
-    if (status == "Chờ xác nhận") {
+    if (status == "notDone") {
+      statusColor = Colors.red;
+    } else if (status == "assigned") {
       statusColor = Colors.orange;
-    } else if (status == "Đã nhận") {
+    } else if (status == "processing") {
+      statusColor = Colors.teal;
+    } else if (status == "waitPayment") {
+      statusColor = Colors.blue;
+    } else if (status == "done") {
       statusColor = Colors.green;
     } else {
-      statusColor = Colors.blue;
+      statusColor = Colors.grey;
     }
-
     // Format cost as currency
     String price =
         '${request.totalCost.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
 
     // Extract date and time information
-    String date = "Chưa có lịch";
+    // String date = "Chưa có lịch";
     String time = "${request.startTime} - ${request.endTime}";
-    if (request.startDate != null) {
-      try {
-        final dateTime = DateTime.parse(request.startDate!);
-        date = '${dateTime.day}/${dateTime.month}';
-      } catch (e) {
-        // Use default if date can't be parsed
+    // if (request.startDate != null) {
+    //   try {
+    //     final dateTime = DateTime.parse(request.startDate!);
+    //     date = '${dateTime.day}/${dateTime.month}';
+    //   } catch (e) {
+    //     // Use default if date can't be parsed
+    //   }
+    // }
+
+    String getVietNameseStatus(String status) {
+      switch (status) {
+        case "notDone":
+          return "Chờ xác nhận";
+        case "assigned":
+          return "Đã nhận việc";
+        case "processing":
+          return "Đang tiến hành";
+        case "waitPayment":
+          return "Chờ thanh toán";
+        case "done":
+          return "Hoàn thành";
+        default:
+          return "Không xác định";
       }
     }
 
@@ -447,11 +488,11 @@ class _HomeContentState extends State<HomeContent> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    status,
+                    '${getVietNameseStatus(status)}',
                     style: TextStyle(
                       color: statusColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                       fontFamily: 'Quicksand',
                     ),
                   ),
@@ -485,16 +526,30 @@ class _HomeContentState extends State<HomeContent> {
                         color: Colors.grey[600],
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        "Ngày bắt đầu: $date",
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 15,
-                          fontFamily: 'Quicksand',
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text('lúc $time'),
+                      Column(
+                        children: [
+                          // Hiển thị startDate trong mọi trường hợp
+                          Text(
+                            "Ngày: ${request.startTime}",
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 15,
+                              fontFamily: 'Quicksand',
+                            ),
+                          ),
+
+                          // Kiểm tra nếu endTime khác null thì hiển thị thêm endTime
+                          if (request.endTime != null)
+                            Text(
+                              "Thời gian: ${request.endTime}",
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontSize: 15,
+                                fontFamily: 'Quicksand',
+                              ),
+                            ),
+                        ],
+                      )
                     ],
                   ),
                 ),
