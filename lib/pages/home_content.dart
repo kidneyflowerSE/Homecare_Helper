@@ -6,17 +6,14 @@ import 'package:homecare_helper/data/model/helper.dart';
 import 'package:homecare_helper/data/model/request.dart';
 import 'package:homecare_helper/data/repository/repository.dart';
 
+import '../data/model/request_detail.dart';
+
 class HomeContent extends StatefulWidget {
   final Helper helper;
-  final List<Requests> requests;
-  final List<Customer> customers;
-  final Future<void> Function() refreshData;
 
   const HomeContent({
     Key? key,
     required this.helper,
-    required this.requests,
-    required this.customers, required this.refreshData,
   }): super(key:key);
 
   @override
@@ -26,6 +23,11 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   String _selectedStatus = "notDone";
   Key  pageKey = UniqueKey();
+  List<Requests> requests = [];
+  List<Requests> helperRequests = [];
+  List<Customer> customers = [];
+  List<RequestDetail> requestDetails = [];
+  bool isLoading = true;
 
   final List<String> _statusFilters = [
     "notDone",
@@ -35,7 +37,46 @@ class _HomeContentState extends State<HomeContent> {
     "done",
   ];
 
-  String getVietNameseStatus(String status) {
+  @override
+  void initState() {
+    super.initState();
+    loadData();
+  }
+
+  Future<void> loadData() async {
+    try {
+      var repository = DefaultRepository();
+
+      var fetchedRequests = await repository.loadRequest();
+      var fetchedCustomers = await repository.loadCustomer();
+      var fetchedRequestDetails = await repository.getRequestDetailById(widget.helper.id);
+
+      setState(() {
+        requests = fetchedRequests ?? [];
+        customers = fetchedCustomers ?? [];
+        requestDetails = fetchedRequestDetails ?? [];
+        updateHelperRequests();
+        isLoading = false;
+        print('cập nhật lại dữ liệu');
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi tải dữ liệu: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void updateHelperRequests() {
+    helperRequests = requests.where((request) =>
+        request.scheduleIds.any((scheduleId) =>
+            requestDetails.any((requestDetail) => requestDetail.id == scheduleId))
+    ).toList();
+  }
+
+  String getVietnameseStatus(String status) {
     switch (status) {
       case "notDone":
         return "Chờ xác nhận";
@@ -54,8 +95,10 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> assignedRequest(Requests request) async {
     var repository = DefaultRepository();
-    await repository.remoteDataSource
-        .assignedRequest(request.scheduleIds.first);
+      for(var id in request.scheduleIds){
+        await repository.remoteDataSource
+            .assignedRequest(id);
+      }
     setState(() {
       request.status = 'assigned';
     });
@@ -98,11 +141,12 @@ class _HomeContentState extends State<HomeContent> {
   @override
   Widget build(BuildContext context) {
     // Filter requests assigned to the logged-in helper
-    List<Requests> helperRequests = widget.requests;
+    updateHelperRequests();
     // print("độ dài: ${helperRequests.length}");
     // Further filter requests based on selected status
     List<Requests> filteredRequests =
         helperRequests.where((req) => req.status == _selectedStatus).toList();
+
 
     return SafeArea(
       child: Container(
@@ -211,7 +255,7 @@ class _HomeContentState extends State<HomeContent> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: FilterChip(
-                      label: Text(getVietNameseStatus(status)),
+                      label: Text(getVietnameseStatus(status)),
                       labelStyle: TextStyle(
                         color: _selectedStatus == status
                             ? Colors.green
@@ -236,7 +280,7 @@ class _HomeContentState extends State<HomeContent> {
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
-                  await widget.refreshData();
+                  loadData();
                   setState(() {
                     pageKey = UniqueKey(); // Thay đổi key để cập nhật lại UI
                   });
@@ -304,7 +348,7 @@ class _HomeContentState extends State<HomeContent> {
             size: 64,
             color: Colors.grey[400],
           ),
-          Text('${widget.requests.length}'),
+          Text('${helperRequests.length}'),
           const SizedBox(height: 16),
           Text(
             "Không có yêu cầu nào",
@@ -503,7 +547,7 @@ class _HomeContentState extends State<HomeContent> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${getVietNameseStatus(status)}',
+                    getVietNameseStatus(status),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 14,
@@ -889,6 +933,7 @@ class _HomeContentState extends State<HomeContent> {
               onPressed: () {
                 // Handle job acceptance logic here
                 assignedRequest(request);
+                Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(

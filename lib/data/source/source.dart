@@ -372,16 +372,16 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> assignedRequest(String id) async {
-    final url = 'https://api.homekare.site/request/assigned';
+    final url = 'https://api.homekare.site/request/assign';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
-    final body = jsonEncode({'id': id});
+    final body = jsonEncode({'detailId': id});
     try {
       final response = await http.post(uri, headers: headers, body: body);
 
       if (response.statusCode == 200) {
         if (kDebugMode) {
-          print('Cancel request posted successfully!');
+          print('Assigned request posted successfully!');
         }
       } else {
         print('Failed to post requests. Status code: ${response.statusCode}');

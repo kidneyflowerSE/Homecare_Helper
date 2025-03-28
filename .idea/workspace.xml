@@ -6,6 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="a6fd4a31-6ad7-40e0-a445-30aa156b35e0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/data/source/source.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/source/source.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/pages/home_content.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/home_content.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/pages/home_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/home_page.dart" afterDir="false" />
     </list>

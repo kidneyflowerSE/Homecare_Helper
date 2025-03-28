@@ -31,49 +31,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  List<Requests> requests = [];
-  List<Requests> helperRequests = [];
-  List<Customer> customers = [];
-  List<RequestDetail> requestDetails = [];
-  bool isLoading = true;
 
-  Future<void> loadData() async {
-    try {
-      var repository = DefaultRepository();
 
-      var fetchedRequests = await repository.loadRequest();
-      var fetchedCustomers = await repository.loadCustomer();
-      var fetchedRequestDetails = await repository.getRequestDetailById(widget.helper.id);
 
-      setState(() {
-        requests = fetchedRequests ?? [];
-        customers = fetchedCustomers ?? [];
-        requestDetails = fetchedRequestDetails ?? [];
-        updateHelperRequests();
-        isLoading = false;
-        print('cập nhật lại dữ liệu');
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi tải dữ liệu: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void updateHelperRequests() {
-    helperRequests = requests.where((request) =>
-        request.scheduleIds.any((scheduleId) =>
-            requestDetails.any((requestDetail) => requestDetail.id == scheduleId))
-    ).toList();
-  }
 
   @override
   void initState() {
     super.initState();
-    loadData();
   }
 
   void _onItemTapped(int index) {
@@ -84,14 +48,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    updateHelperRequests(); // Đảm bảo helperRequests luôn được cập nhật
 
     final List<Widget> pages = [
       HomeContent(
-        refreshData: loadData,
         helper: widget.helper,
-        requests: helperRequests,
-        customers: customers,
       ),
       const HistoryPage(),
       const NotificationPage(),
@@ -99,9 +59,7 @@ class _HomePageState extends State<HomePage> {
     ];
 
     return Scaffold(
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : pages[_selectedIndex.clamp(0, pages.length - 1)],
+      body: pages[_selectedIndex.clamp(0, pages.length - 1)],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
