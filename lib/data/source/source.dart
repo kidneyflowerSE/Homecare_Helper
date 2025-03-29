@@ -43,6 +43,8 @@ abstract interface class DataSource {
 
   Future<void> finishPayment(String id);
 
+  Future<void> waitPayment(String id);
+
   Future<List<TimeOff>?> loadTimeOffData();
 
   Future<List<Message>?> loadMessageData(Message message);
@@ -338,6 +340,28 @@ class RemoteDataSource implements DataSource {
       if (response.statusCode == 200) {
         if (kDebugMode) {
           print('Cancel request posted successfully!');
+        }
+      } else {
+        print('Failed to post requests. Status code: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
+    } catch (e) {
+      print('Error posting requests: $e');
+    }
+  }
+
+  @override
+  Future<void> waitPayment(String id) async {
+    final url = 'https://api.homekare.site/request/waitpayment';
+    final uri = Uri.parse(url);
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({'id': id});
+    try {
+      final response = await http.post(uri, headers: headers, body: body);
+
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          print('Wait payment request posted successfully!');
         }
       } else {
         print('Failed to post requests. Status code: ${response.statusCode}');

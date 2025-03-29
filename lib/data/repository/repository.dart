@@ -41,6 +41,8 @@ abstract interface class Repository {
 
   Future<void> doneConfirmRequest(String id);
 
+  Future<void> waitPaymentRequest(String id);
+
   Future<void> finishPayment(String id);
 
   Future<void> sendMessage(String phone);
@@ -187,5 +189,10 @@ class DefaultRepository implements Repository {
   @override
   Future<void> processingRequest(String id) async {
     return await remoteDataSource.processingRequest(id);
+  }
+
+  @override
+  Future<void> waitPaymentRequest(String id) async {
+    return await remoteDataSource.waitPayment(id);
   }
 }

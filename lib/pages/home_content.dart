@@ -14,7 +14,7 @@ class HomeContent extends StatefulWidget {
   const HomeContent({
     Key? key,
     required this.helper,
-  }): super(key:key);
+  }) : super(key: key);
 
   @override
   State<HomeContent> createState() => _HomeContentState();
@@ -22,7 +22,7 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent> {
   String _selectedStatus = "notDone";
-  Key  pageKey = UniqueKey();
+  Key pageKey = UniqueKey();
   List<Requests> requests = [];
   List<Requests> helperRequests = [];
   List<Customer> customers = [];
@@ -49,7 +49,8 @@ class _HomeContentState extends State<HomeContent> {
 
       var fetchedRequests = await repository.loadRequest();
       var fetchedCustomers = await repository.loadCustomer();
-      var fetchedRequestDetails = await repository.getRequestDetailById(widget.helper.id);
+      var fetchedRequestDetails =
+          await repository.getRequestDetailById(widget.helper.id);
 
       setState(() {
         requests = fetchedRequests ?? [];
@@ -70,10 +71,11 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   void updateHelperRequests() {
-    helperRequests = requests.where((request) =>
-        request.scheduleIds.any((scheduleId) =>
-            requestDetails.any((requestDetail) => requestDetail.id == scheduleId))
-    ).toList();
+    helperRequests = requests
+        .where((request) => request.scheduleIds.any((scheduleId) =>
+            requestDetails
+                .any((requestDetail) => requestDetail.id == scheduleId)))
+        .toList();
   }
 
   String getVietnameseStatus(String status) {
@@ -95,30 +97,49 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> assignedRequest(Requests request) async {
     var repository = DefaultRepository();
-      for(var id in request.scheduleIds){
-        await repository.remoteDataSource
-            .assignedRequest(id);
-      }
+    for (var id in request.scheduleIds) {
+      await repository.remoteDataSource.assignedRequest(id);
+    }
     setState(() {
       request.status = 'assigned';
     });
   }
 
-  Future<void> processingRequest(Requests request) async {
+  Future<void> processingRequest(Requests request, int index) async {
     var repository = DefaultRepository();
-    await repository.remoteDataSource
-        .processingRequest(request.scheduleIds.first);
+    for (var i=0;i<index;++i) {
+      await repository.remoteDataSource.processingRequest(request.scheduleIds[i]);
+    }
     setState(() {
       request.status = 'processing';
     });
   }
 
-  Future<void> finishRequest(Requests request) async {
+  Future<void> finishRequest(Requests request, int index) async {
+    var isAllDone = true;
     var repository = DefaultRepository();
-    await repository.remoteDataSource.finishRequest(request.scheduleIds.first);
-    setState(() {
-      request.status = 'waitPayment';
-    });
+
+    for (var id = 0;id<index;++id) {
+      await repository.remoteDataSource.finishRequest(request.scheduleIds[id]);
+    }
+
+    var details = await repository.loadRequestDetailId(request.scheduleIds);
+
+    for (var detail in details!) {
+      print(detail);
+      print(details.length);
+      if (detail.status != 'done') {
+        isAllDone = false;
+        break;
+      }
+    }
+
+    if (isAllDone) {
+      await repository.remoteDataSource.waitPayment(request.id);
+      setState(() {
+        request.status = 'waitPayment';
+      });
+    }
   }
 
   Future<void> finishPayment(Requests request) async {
@@ -146,7 +167,6 @@ class _HomeContentState extends State<HomeContent> {
     // Further filter requests based on selected status
     List<Requests> filteredRequests =
         helperRequests.where((req) => req.status == _selectedStatus).toList();
-
 
     return SafeArea(
       child: Container(
@@ -290,13 +310,13 @@ class _HomeContentState extends State<HomeContent> {
                   child: filteredRequests.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
-                    key: const PageStorageKey<String>('job_list'),
-                    itemCount: filteredRequests.length,
-                    itemBuilder: (context, index) {
-                      final request = filteredRequests[index];
-                      return _buildJobCard(request);
-                    },
-                  ),
+                          key: const PageStorageKey<String>('job_list'),
+                          itemCount: filteredRequests.length,
+                          itemBuilder: (context, index) {
+                            final request = filteredRequests[index];
+                            return _buildJobCard(request);
+                          },
+                        ),
                 ),
               ),
             ),
@@ -432,10 +452,16 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildJobCard(Requests request) {
-    // Get job status
+    DateTime now = DateTime(
+        DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    DateTime start = DateTime(
+        DateTime.parse(request.startTime).year,
+        DateTime.parse(request.startTime).month,
+        DateTime.parse(request.startTime).day);
+
     String status = request.status;
-    // Define status color
     Color statusColor;
+
     if (status == "notDone") {
       statusColor = Colors.red;
     } else if (status == "assigned") {
@@ -449,37 +475,15 @@ class _HomeContentState extends State<HomeContent> {
     } else {
       statusColor = Colors.grey;
     }
-    // Format cost as currency
+
     String price =
         '${request.totalCost.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
 
-    // Extract date and time information
-    // String date = "Chưa có lịch";
     String time = "${request.startTime} - ${request.endTime}";
-    // if (request.startDate != null) {
-    //   try {
-    //     final dateTime = DateTime.parse(request.startDate!);
-    //     date = '${dateTime.day}/${dateTime.month}';
-    //   } catch (e) {
-    //     // Use default if date can't be parsed
-    //   }
-    // }
 
-    String getVietNameseStatus(String status) {
-      switch (status) {
-        case "notDone":
-          return "Chờ xác nhận";
-        case "assigned":
-          return "Đã nhận việc";
-        case "processing":
-          return "Đang tiến hành";
-        case "waitPayment":
-          return "Chờ thanh toán";
-        case "done":
-          return "Hoàn thành";
-        default:
-          return "Không xác định";
-      }
+    int index = -1; // Mặc định
+    if ((status == "processing" || status == 'assigned')&& (start.isBefore(now) || start.isAtSameMomentAs(now))) {
+      index = now.difference(start).inDays;
     }
 
     return Container(
@@ -497,7 +501,6 @@ class _HomeContentState extends State<HomeContent> {
       ),
       child: Column(
         children: [
-          // Job header
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -541,13 +544,13 @@ class _HomeContentState extends State<HomeContent> {
                 ),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    getVietNameseStatus(status),
+                    getVietnameseStatus(status),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 14,
@@ -560,7 +563,6 @@ class _HomeContentState extends State<HomeContent> {
             ),
           ),
           Divider(height: 1, color: Colors.grey[200]),
-          // Job details
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -576,7 +578,7 @@ class _HomeContentState extends State<HomeContent> {
                 const SizedBox(height: 8),
                 SingleChildScrollView(
                   scrollDirection:
-                      Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
+                  Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
                   child: Row(
                     children: [
                       Icon(
@@ -587,7 +589,6 @@ class _HomeContentState extends State<HomeContent> {
                       const SizedBox(width: 8),
                       Column(
                         children: [
-                          // Hiển thị startDate trong mọi trường hợp
                           Text(
                             "Ngày: ${request.startTime}",
                             style: TextStyle(
@@ -596,17 +597,14 @@ class _HomeContentState extends State<HomeContent> {
                               fontFamily: 'Quicksand',
                             ),
                           ),
-
-                          // Kiểm tra nếu endTime khác null thì hiển thị thêm endTime
-                          if (request.endTime != null)
-                            Text(
-                              "Thời gian: ${request.endTime}",
-                              style: TextStyle(
-                                color: Colors.grey[700],
-                                fontSize: 15,
-                                fontFamily: 'Quicksand',
-                              ),
+                          Text(
+                            "Thời gian: ${request.endTime}",
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 15,
+                              fontFamily: 'Quicksand',
                             ),
+                          ),
                         ],
                       )
                     ],
@@ -660,11 +658,11 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         ),
                       ),
-                    ] else if (status == "assigned") ...[
+                    ] else if (status == "assigned" && index >= 0) ...[
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            processingRequest(request);
+                            processingRequest(request, index);
                           },
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -683,11 +681,11 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         ),
                       ),
-                    ] else if (status == "Đang thực hiện") ...[
+                    ] else if (status == "processing" && index >= 0) ...[
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            // Handle finish work
+                            finishRequest(request, index);
                           },
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -696,8 +694,8 @@ class _HomeContentState extends State<HomeContent> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text(
-                            "Hoàn thành",
+                          child: Text(
+                            "Hoàn thành (Ngày: $index)",
                             style: TextStyle(
                               fontFamily: 'Quicksand',
                               color: Colors.white,
