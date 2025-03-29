@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:homecare_helper/data/model/customer.dart';
 import 'package:homecare_helper/data/model/helper.dart';
@@ -7,6 +5,10 @@ import 'package:homecare_helper/data/model/request.dart';
 import 'package:homecare_helper/data/repository/repository.dart';
 
 import '../data/model/request_detail.dart';
+
+// Ràng buộc
+//  !(completedDaysMap[request.id]?.contains(index) ?? false)
+// index >= 0 cho status assigned và processing
 
 class HomeContent extends StatefulWidget {
   final Helper helper;
@@ -28,6 +30,7 @@ class _HomeContentState extends State<HomeContent> {
   List<Customer> customers = [];
   List<RequestDetail> requestDetails = [];
   bool isLoading = true;
+  Map<String, Set<int>> completedDaysMap = {};
 
   final List<String> _statusFilters = [
     "notDone",
@@ -97,9 +100,7 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> assignedRequest(Requests request) async {
     var repository = DefaultRepository();
-    for (var id in request.scheduleIds) {
-      await repository.remoteDataSource.assignedRequest(id);
-    }
+    await repository.remoteDataSource.assignedRequest(request.id);
     setState(() {
       request.status = 'assigned';
     });
@@ -107,8 +108,9 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> processingRequest(Requests request, int index) async {
     var repository = DefaultRepository();
-    for (var i=0;i<index;++i) {
-      await repository.remoteDataSource.processingRequest(request.scheduleIds[i]);
+    for (var i = 0; i < index; ++i) {
+      await repository.remoteDataSource
+          .processingRequest(request.scheduleIds[i]);
     }
     setState(() {
       request.status = 'processing';
@@ -116,30 +118,35 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Future<void> finishRequest(Requests request, int index) async {
-    var isAllDone = true;
     var repository = DefaultRepository();
 
-    for (var id = 0;id<index;++id) {
-      await repository.remoteDataSource.finishRequest(request.scheduleIds[id]);
+    // Ràng buộc ngày
+    // if (!completedDaysMap.containsKey(request.id)) {
+    //   completedDaysMap[request.id] = {};
+    // }
+    //
+    // if (!completedDaysMap[request.id]!.contains(index)) {
+    //   for (var id = 0; id < index; ++id) {
+    //     await repository.remoteDataSource.finishRequest(
+    //         request.scheduleIds[id]);
+    //   }
+    //
+    //   // await repository.remoteDataSource.waitPayment(request.id);
+    //   setState(() {
+    //     request.status = 'waitPayment';
+    //     completedDaysMap[request.id]!.add(index);
+    //   });
+    // }
+
+    for (var id = 0; id < index; ++id) {
+      await repository.remoteDataSource.finishRequest(
+          request.scheduleIds[id]);
     }
 
-    var details = await repository.loadRequestDetailId(request.scheduleIds);
-
-    for (var detail in details!) {
-      print(detail);
-      print(details.length);
-      if (detail.status != 'done') {
-        isAllDone = false;
-        break;
-      }
-    }
-
-    if (isAllDone) {
-      await repository.remoteDataSource.waitPayment(request.id);
-      setState(() {
-        request.status = 'waitPayment';
-      });
-    }
+    // await repository.remoteDataSource.waitPayment(request.id);
+    setState(() {
+      request.status = 'waitPayment';
+    });
   }
 
   Future<void> finishPayment(Requests request) async {
@@ -452,8 +459,8 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildJobCard(Requests request) {
-    DateTime now = DateTime(
-        DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    DateTime now =
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     DateTime start = DateTime(
         DateTime.parse(request.startTime).year,
         DateTime.parse(request.startTime).month,
@@ -481,8 +488,10 @@ class _HomeContentState extends State<HomeContent> {
 
     String time = "${request.startTime} - ${request.endTime}";
 
-    int index = -1; // Mặc định
-    if ((status == "processing" || status == 'assigned')&& (start.isBefore(now) || start.isAtSameMomentAs(now))) {
+    // Ràng buộc nếu chưa đến ngày thì không được processing hay done detail
+    int index = request.scheduleIds.length; // Mặc định
+    if ((status == "processing" || status == 'assigned') &&
+        (start.isBefore(now) || start.isAtSameMomentAs(now))) {
       index = now.difference(start).inDays;
     }
 
@@ -544,7 +553,7 @@ class _HomeContentState extends State<HomeContent> {
                 ),
                 Container(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -578,7 +587,7 @@ class _HomeContentState extends State<HomeContent> {
                 const SizedBox(height: 8),
                 SingleChildScrollView(
                   scrollDirection:
-                  Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
+                      Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
                   child: Row(
                     children: [
                       Icon(
@@ -658,7 +667,7 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         ),
                       ),
-                    ] else if (status == "assigned" && index >= 0) ...[
+                    ] else if (status == "assigned") ...[
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
@@ -681,7 +690,7 @@ class _HomeContentState extends State<HomeContent> {
                           ),
                         ),
                       ),
-                    ] else if (status == "processing" && index >= 0) ...[
+                    ] else if (status == "processing") ...[
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
