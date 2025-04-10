@@ -1,6 +1,5 @@
 class Helper {
   String id;
-  num baseFactor;
   String? helperId;
   String? fullName;
   String? startDate;
@@ -21,11 +20,9 @@ class Helper {
   String? educationLevel;
   num height;
   num weight;
-  bool deleted;
 
   Helper({
     required this.id,
-    required this.baseFactor,
     required this.helperId,
     required this.fullName,
     required this.startDate,
@@ -46,13 +43,11 @@ class Helper {
     required this.educationLevel,
     required this.height,
     required this.weight,
-    required this.deleted,
   });
 
   factory Helper.fromJson(Map<String, dynamic> map) {
     return Helper(
       id: map['_id'],
-      baseFactor: map['baseFactor'],
       helperId: map['helper_id'],
       fullName: map['fullName'],
       startDate: map['startDate'],
@@ -73,7 +68,6 @@ class Helper {
       educationLevel: map['educationLevel'],
       height: map['height'].toDouble(), // Convert to double
       weight: map['weight'].toDouble(), // Convert to double
-      deleted: map['deleted'],
     );
   }
 
@@ -82,7 +76,6 @@ class Helper {
       identical(this, other) ||
       other is Helper &&
           runtimeType == other.runtimeType &&
-          baseFactor == other.baseFactor &&
           helperId == other.helperId &&
           fullName == other.fullName &&
           startDate == other.startDate &&
@@ -102,12 +95,10 @@ class Helper {
           nationality == other.nationality &&
           educationLevel == other.educationLevel &&
           height == other.height &&
-          weight == other.weight &&
-          deleted == other.deleted;
+          weight == other.weight;
 
   @override
   int get hashCode =>
-      baseFactor.hashCode ^
       helperId.hashCode ^
       fullName.hashCode ^
       startDate.hashCode ^
@@ -127,12 +118,11 @@ class Helper {
       nationality.hashCode ^
       educationLevel.hashCode ^
       height.hashCode ^
-      weight.hashCode ^
-      deleted.hashCode;
+      weight.hashCode;
 
   @override
   String toString() {
-    return 'Cleaner{baseFactor: $baseFactor, helperId: $helperId, fullName: $fullName, startDate: $startDate, birthDay: $birthDay, phone: $phone, birthPlace: $birthPlace, address: $address, workingArea: $workingArea, jobDetail: $jobDetail, jobs: $jobs, yearOfExperience: $yearOfExperience, experienceDescription: $experienceDescription, avatar: $avatar, healthCertificates: $healthCertificates, salaryId: $salaryId, gender: $gender, nationality: $nationality, educationLevel: $educationLevel, height: $height, weight: $weight, deleted: $deleted}';
+    return 'Cleaner{helperId: $helperId, fullName: $fullName, startDate: $startDate, birthDay: $birthDay, phone: $phone, birthPlace: $birthPlace, address: $address, workingArea: $workingArea, jobDetail: $jobDetail, jobs: $jobs, yearOfExperience: $yearOfExperience, experienceDescription: $experienceDescription, avatar: $avatar, healthCertificates: $healthCertificates, salaryId: $salaryId, gender: $gender, nationality: $nationality, educationLevel: $educationLevel, height: $height, weight: $weight}';
   }
 }
 

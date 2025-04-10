@@ -1,3 +1,6 @@
+import 'dart:ffi';
+
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:homecare_helper/data/model/customer.dart';
 import 'package:homecare_helper/data/model/helper.dart';
@@ -98,6 +101,18 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  Map<String, num> getMonthlyIncome(List<RequestDetail> detailList){
+    var allDoneDetail = detailList.where((detail) => detail.status == 'done').toList();
+
+    var groupedDetail = groupBy(allDoneDetail, (RequestDetail d){
+      final date = DateTime.parse(d.workingDate!);
+      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
+    });
+
+    return groupedDetail.map((month, details) =>
+        MapEntry(month, details.fold(0.0, (sum, d) => sum + d.helperCost!)));
+  }
+
   Future<void> assignedRequest(Requests request) async {
     var repository = DefaultRepository();
     await repository.remoteDataSource.assignedRequest(request.id);
@@ -108,9 +123,10 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> processingRequest(Requests request, int index) async {
     var repository = DefaultRepository();
+    print(index);
     for (var i = 0; i < index; ++i) {
-      await repository.remoteDataSource
-          .processingRequest(request.scheduleIds[i]);
+      await repository.processingRequest(request.scheduleIds[i]);
+      print(request.scheduleIds[i]);
     }
     setState(() {
       request.status = 'processing';
@@ -119,6 +135,8 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> finishRequest(Requests request, int index) async {
     var repository = DefaultRepository();
+
+    var order = requestDetails.where((req) => req.id == request.scheduleIds[index]);
 
     // Ràng buộc ngày
     // if (!completedDaysMap.containsKey(request.id)) {
@@ -139,8 +157,7 @@ class _HomeContentState extends State<HomeContent> {
     // }
 
     for (var id = 0; id < index; ++id) {
-      await repository.remoteDataSource.finishRequest(
-          request.scheduleIds[id]);
+      await repository.doneConfirmRequest(request.scheduleIds[id]);
     }
 
     // await repository.remoteDataSource.waitPayment(request.id);
@@ -174,6 +191,12 @@ class _HomeContentState extends State<HomeContent> {
     // Further filter requests based on selected status
     List<Requests> filteredRequests =
         helperRequests.where((req) => req.status == _selectedStatus).toList();
+
+    Map<String, num> income = getMonthlyIncome(requestDetails);
+    final now = DateTime.now();
+    final currentMonthKey = "${now.year}-${now.month.toString().padLeft(2, '0')}";
+
+    final currentMonthIncome = income[currentMonthKey] ?? 0.0;
 
     return SafeArea(
       child: Container(
@@ -249,7 +272,7 @@ class _HomeContentState extends State<HomeContent> {
                   child: _buildSummaryCard(
                     icon: Icons.work,
                     color: Colors.blue,
-                    title: "Công việc hôm nay",
+                    title: "Công việc tháng này",
                     value: _countTodayJobs(helperRequests).toString(),
                   ),
                 ),
@@ -259,7 +282,8 @@ class _HomeContentState extends State<HomeContent> {
                     icon: Icons.monetization_on,
                     color: Colors.green,
                     title: "Thu nhập tháng",
-                    value: _calculateMonthlyIncome(helperRequests),
+                    // value: _calculateMonthlyIncome(helperRequests),
+                    value: currentMonthIncome.toString(),
                   ),
                 ),
               ],
@@ -364,6 +388,8 @@ class _HomeContentState extends State<HomeContent> {
     // Format as Vietnamese currency
     return '${totalIncome.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
   }
+
+
 
   Widget _buildEmptyState() {
     return Center(
@@ -490,9 +516,10 @@ class _HomeContentState extends State<HomeContent> {
 
     // Ràng buộc nếu chưa đến ngày thì không được processing hay done detail
     int index = request.scheduleIds.length; // Mặc định
+    print('giá trị index là $index');
     if ((status == "processing" || status == 'assigned') &&
-        (start.isBefore(now) || start.isAtSameMomentAs(now))) {
-      index = now.difference(start).inDays;
+        start.isAtSameMomentAs(now)) {
+      index = now.difference(start).inDays + 1;
     }
 
     return Container(

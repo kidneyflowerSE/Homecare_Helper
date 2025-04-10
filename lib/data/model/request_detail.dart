@@ -3,7 +3,7 @@ class RequestDetail {
   String? workingDate;
   String? helperID;
   String? status;
-  int? helperCost;
+  num? helperCost;
 
   RequestDetail({
     required this.id,
