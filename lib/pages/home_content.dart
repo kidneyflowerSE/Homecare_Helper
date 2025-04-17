@@ -190,7 +190,12 @@ class _HomeContentState extends State<HomeContent> {
     // print("độ dài: ${helperRequests.length}");
     // Further filter requests based on selected status
     List<Requests> filteredRequests =
-        helperRequests.where((req) => req.status == _selectedStatus).toList();
+    helperRequests.where((req) => req.status == _selectedStatus).toList()
+      ..sort((a, b) {
+        DateTime dateA = DateTime.parse(a.startTime ?? DateTime.now().toString());
+        DateTime dateB = DateTime.parse(b.startTime ?? DateTime.now().toString());
+        return dateB.compareTo(dateA); // sắp xếp giảm dần
+      });
 
     Map<String, num> income = getMonthlyIncome(requestDetails);
     final now = DateTime.now();
