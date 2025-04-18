@@ -1,17 +1,10 @@
-import 'dart:ffi';
-
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:homecare_helper/data/model/customer.dart';
 import 'package:homecare_helper/data/model/helper.dart';
 import 'package:homecare_helper/data/model/request.dart';
 import 'package:homecare_helper/data/repository/repository.dart';
-
-import '../data/model/request_detail.dart';
-
-// Ràng buộc
-//  !(completedDaysMap[request.id]?.contains(index) ?? false)
-// index >= 0 cho status assigned và processing
+import 'package:homecare_helper/data/model/request_detail.dart';
 
 class HomeContent extends StatefulWidget {
   final Helper helper;
@@ -25,7 +18,8 @@ class HomeContent extends StatefulWidget {
   State<HomeContent> createState() => _HomeContentState();
 }
 
-class _HomeContentState extends State<HomeContent> {
+class _HomeContentState extends State<HomeContent>
+    with SingleTickerProviderStateMixin {
   String _selectedStatus = "notDone";
   Key pageKey = UniqueKey();
   List<Requests> requests = [];
@@ -33,23 +27,79 @@ class _HomeContentState extends State<HomeContent> {
   List<Customer> customers = [];
   List<RequestDetail> requestDetails = [];
   bool isLoading = true;
+  late TabController _tabController;
   Map<String, Set<int>> completedDaysMap = {};
+  final currencyFormat =
+      NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
 
-  final List<String> _statusFilters = [
-    "notDone",
-    "assigned",
-    "processing",
-    "waitPayment",
-    "done",
-  ];
+  final Map<String, Map<String, dynamic>> _statusInfo = {
+    "notDone": {
+      "label": "Chờ xác nhận",
+      "color": Colors.amber,
+      "icon": Icons.access_time,
+    },
+    "assigned": {
+      "label": "Đã nhận việc",
+      "color": Colors.cyan,
+      "icon": Icons.assignment_turned_in,
+    },
+    "processing": {
+      "label": "Đang tiến hành",
+      "color": Colors.blue,
+      "icon": Icons.hourglass_top,
+    },
+    "waitPayment": {
+      "label": "Chờ thanh toán",
+      "color": Colors.orange,
+      "icon": Icons.payments,
+    },
+    "done": {
+      "label": "Hoàn thành",
+      "color": Colors.green,
+      "icon": Icons.check_circle,
+    },
+  };
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 5, vsync: this);
+    _tabController.addListener(() {
+      setState(() {
+        _selectedStatus = _getStatusByTabIndex(_tabController.index);
+      });
+    });
     loadData();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  String _getStatusByTabIndex(int index) {
+    switch (index) {
+      case 0:
+        return "notDone";
+      case 1:
+        return "assigned";
+      case 2:
+        return "processing";
+      case 3:
+        return "waitPayment";
+      case 4:
+        return "done";
+      default:
+        return "notDone";
+    }
+  }
+
   Future<void> loadData() async {
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       var repository = DefaultRepository();
 
@@ -64,15 +114,20 @@ class _HomeContentState extends State<HomeContent> {
         requestDetails = fetchedRequestDetails ?? [];
         updateHelperRequests();
         isLoading = false;
-        print('cập nhật lại dữ liệu');
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi tải dữ liệu: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setState(() {
+        isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải dữ liệu: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -84,33 +139,46 @@ class _HomeContentState extends State<HomeContent> {
         .toList();
   }
 
-  String getVietnameseStatus(String status) {
-    switch (status) {
-      case "notDone":
-        return "Chờ xác nhận";
-      case "assigned":
-        return "Đã nhận việc";
-      case "processing":
-        return "Đang tiến hành";
-      case "waitPayment":
-        return "Chờ thanh toán";
-      case "done":
-        return "Hoàn thành";
-      default:
-        return "Không xác định";
-    }
+  int _countWeeklyJobs(List<Requests> requests) {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
+    return requests.where((req) {
+      if (req.startTime == null) return false;
+      try {
+        final jobDate = DateTime.parse(req.startTime!);
+        return jobDate.isAfter(startOfWeek) &&
+            jobDate.isBefore(endOfWeek.add(const Duration(days: 1)));
+      } catch (e) {
+        return false;
+      }
+    }).length;
   }
 
-  Map<String, num> getMonthlyIncome(List<RequestDetail> detailList){
-    var allDoneDetail = detailList.where((detail) => detail.status == 'done').toList();
+  double _calculateWeeklyIncome() {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
-    var groupedDetail = groupBy(allDoneDetail, (RequestDetail d){
-      final date = DateTime.parse(d.workingDate!);
-      return "${date.year}-${date.month.toString().padLeft(2, '0')}";
-    });
+    return requestDetails
+        .where((detail) =>
+            detail.status == 'done' &&
+            detail.workingDate != null &&
+            DateTime.parse(detail.workingDate!).isAfter(startOfWeek) &&
+            DateTime.parse(detail.workingDate!)
+                .isBefore(endOfWeek.add(const Duration(days: 1))))
+        .fold(0.0, (sum, detail) => sum + (detail.helperCost ?? 0));
+  }
 
-    return groupedDetail.map((month, details) =>
-        MapEntry(month, details.fold(0.0, (sum, d) => sum + d.helperCost!)));
+  double _calculateTotalEarnings() {
+    return requestDetails
+        .where((detail) => detail.status == 'done')
+        .fold(0.0, (sum, detail) => sum + (detail.helperCost ?? 0));
+  }
+
+  int _getJobCountByStatus(String status) {
+    return helperRequests.where((req) => req.status == status).length;
   }
 
   Future<void> assignedRequest(Requests request) async {
@@ -123,10 +191,8 @@ class _HomeContentState extends State<HomeContent> {
 
   Future<void> processingRequest(Requests request, int index) async {
     var repository = DefaultRepository();
-    print(index);
     for (var i = 0; i < index; ++i) {
       await repository.processingRequest(request.scheduleIds[i]);
-      print(request.scheduleIds[i]);
     }
     setState(() {
       request.status = 'processing';
@@ -136,31 +202,10 @@ class _HomeContentState extends State<HomeContent> {
   Future<void> finishRequest(Requests request, int index) async {
     var repository = DefaultRepository();
 
-    var order = requestDetails.where((req) => req.id == request.scheduleIds[index]);
-
-    // Ràng buộc ngày
-    // if (!completedDaysMap.containsKey(request.id)) {
-    //   completedDaysMap[request.id] = {};
-    // }
-    //
-    // if (!completedDaysMap[request.id]!.contains(index)) {
-    //   for (var id = 0; id < index; ++id) {
-    //     await repository.remoteDataSource.finishRequest(
-    //         request.scheduleIds[id]);
-    //   }
-    //
-    //   // await repository.remoteDataSource.waitPayment(request.id);
-    //   setState(() {
-    //     request.status = 'waitPayment';
-    //     completedDaysMap[request.id]!.add(index);
-    //   });
-    // }
-
     for (var id = 0; id < index; ++id) {
       await repository.doneConfirmRequest(request.scheduleIds[id]);
     }
 
-    // await repository.remoteDataSource.waitPayment(request.id);
     setState(() {
       request.status = 'waitPayment';
     });
@@ -177,241 +222,368 @@ class _HomeContentState extends State<HomeContent> {
   Future<void> cancelRequest(Requests request) async {
     var repository = DefaultRepository();
     await repository.remoteDataSource.cancelRequest(request.id);
-    print("thông tin huỷ request $request");
+    print("Thông tin huỷ request $request");
     setState(() {
       request.status = 'cancelled';
     });
   }
 
+  String formatDate(String dateString) {
+    DateTime date = DateTime.parse(dateString);
+    String day = date.day.toString().padLeft(2, '0');
+    String month = date.month.toString().padLeft(2, '0');
+    String year = date.year.toString();
+    return '$day/$month/$year';
+  }
+
+  String formatTime(String dateString) {
+    DateTime date = DateTime.parse(dateString);
+    String minutes = date.minute.toString().padLeft(2, '0');
+    String hours = date.hour.toString().padLeft(2, '0');
+    return '$hours:$minutes';
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Filter requests assigned to the logged-in helper
     updateHelperRequests();
-    // print("độ dài: ${helperRequests.length}");
-    // Further filter requests based on selected status
+
+    // Filter requests based on selected status
     List<Requests> filteredRequests =
-    helperRequests.where((req) => req.status == _selectedStatus).toList()
-      ..sort((a, b) {
-        DateTime dateA = DateTime.parse(a.startTime ?? DateTime.now().toString());
-        DateTime dateB = DateTime.parse(b.startTime ?? DateTime.now().toString());
-        return dateB.compareTo(dateA); // sắp xếp giảm dần
-      });
-
-    Map<String, num> income = getMonthlyIncome(requestDetails);
-    final now = DateTime.now();
-    final currentMonthKey = "${now.year}-${now.month.toString().padLeft(2, '0')}";
-
-    final currentMonthIncome = income[currentMonthKey] ?? 0.0;
+        helperRequests.where((req) => req.status == _selectedStatus).toList()
+          ..sort((a, b) {
+            DateTime dateA =
+                DateTime.parse(a.startTime ?? DateTime.now().toString());
+            DateTime dateB =
+                DateTime.parse(b.startTime ?? DateTime.now().toString());
+            return dateB.compareTo(dateA); // Sort by most recent first
+          });
 
     return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        color: Colors.grey[50],
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with greeting and helper info
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundImage: NetworkImage('${widget.helper.avatar}'),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Xin chào,",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                          fontFamily: 'Quicksand',
+      child: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: loadData,
+              child: NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) {
+                  return [
+                    SliverToBoxAdapter(
+                      child: _buildHeader(),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _buildDashboard(),
+                    ),
+                    SliverPersistentHeader(
+                      delegate: _SliverAppBarDelegate(
+                        TabBar(
+                          controller: _tabController,
+                          isScrollable: true,
+                          labelColor: Colors.green,
+                          unselectedLabelColor: Colors.grey.shade400,
+                          indicatorColor: Colors.green,
+                          tabs: _statusInfo.entries.map((entry) {
+                            return Tab(
+                              icon: Badge(
+                                backgroundColor: Colors.red,
+                                label: Text(
+                                    _getJobCountByStatus(entry.key).toString()),
+                                isLabelVisible:
+                                    _getJobCountByStatus(entry.key) > 0,
+                                child: Icon(entry.value["icon"]),
+                              ),
+                              text: entry.value["label"],
+                            );
+                          }).toList(),
                         ),
                       ),
-                      Text(
-                        '${widget.helper.fullName}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Quicksand',
-                        ),
-                      ),
-                    ],
-                  ),
+                      pinned: true,
+                    ),
+                  ];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: _statusInfo.keys.map((status) {
+                    final statusRequests = helperRequests
+                        .where((req) => req.status == status)
+                        .toList()
+                      ..sort((a, b) {
+                        DateTime dateA = DateTime.parse(
+                            a.startTime ?? DateTime.now().toString());
+                        DateTime dateB = DateTime.parse(
+                            b.startTime ?? DateTime.now().toString());
+                        return dateB.compareTo(dateA);
+                      });
+
+                    if (statusRequests.isEmpty) {
+                      return _buildEmptyState(status);
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      itemCount: statusRequests.length,
+                      itemBuilder: (context, index) {
+                        return _buildJobCard(statusRequests[index]);
+                      },
+                    );
+                  }).toList(),
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 16,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        "Trực tuyến",
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.w500,
-                          fontFamily: 'Quicksand',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Summary cards
-            Row(
-              children: [
-                Flexible(
-                  child: _buildSummaryCard(
-                    icon: Icons.work,
-                    color: Colors.blue,
-                    title: "Công việc tháng này",
-                    value: _countTodayJobs(helperRequests).toString(),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Flexible(
-                  child: _buildSummaryCard(
-                    icon: Icons.monetization_on,
-                    color: Colors.green,
-                    title: "Thu nhập tháng",
-                    // value: _calculateMonthlyIncome(helperRequests),
-                    value: currentMonthIncome.toString(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Filter chips
-            const Text(
-              "Yêu cầu công việc tuần này",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'Quicksand',
               ),
             ),
-            const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Wrap(
-                children: _statusFilters.map((status) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: FilterChip(
-                      label: Text(getVietnameseStatus(status)),
-                      labelStyle: TextStyle(
-                        color: _selectedStatus == status
-                            ? Colors.green
-                            : Colors.grey[600],
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.05),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 2),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundImage: widget.helper.avatar!.isEmpty
+                      ? NetworkImage('${widget.helper.avatar}')
+                      : null,
+                  child: widget.helper.avatar!.isEmpty
+                      ? Icon(Icons.person, color: Colors.green)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Xin chào,",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
                         fontFamily: 'Quicksand',
                       ),
-                      selected: _selectedStatus == status,
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedStatus = status;
-                        });
-                      },
-                      selectedColor: Colors.green.withOpacity(0.2),
-                      checkmarkColor: Colors.green,
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Job listings
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  loadData();
-                  setState(() {
-                    pageKey = UniqueKey(); // Thay đổi key để cập nhật lại UI
-                  });
-                },
-                child: KeyedSubtree(
-                  key: pageKey,
-                  child: filteredRequests.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          key: const PageStorageKey<String>('job_list'),
-                          itemCount: filteredRequests.length,
-                          itemBuilder: (context, index) {
-                            final request = filteredRequests[index];
-                            return _buildJobCard(request);
-                          },
-                        ),
+                    Text(
+                      '${widget.helper.fullName}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                        fontFamily: 'Quicksand',
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      "Trực tuyến",
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        fontFamily: 'Quicksand',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  // Count jobs scheduled for today
-  int _countTodayJobs(List<Requests> requests) {
-    final today = DateTime.now().toString().split(' ')[0]; // Get YYYY-MM-DD
-    return requests
-        .where((req) => req.startDate?.contains(today) ?? false)
-        .length;
+  Widget _buildDashboard() {
+    final weeklyIncome = _calculateWeeklyIncome();
+    final totalEarnings = _calculateTotalEarnings();
+    final weeklyJobs = _countWeeklyJobs(helperRequests);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Thống kê của bạn",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Quicksand',
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  // Theme.of(context).primaryColor,
+                  // Theme.of(context).primaryColor.withOpacity(0.7),
+                  Colors.green,
+                  Colors.green.withOpacity(0.7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).primaryColor.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Tổng thu nhập",
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  currencyFormat.format(totalEarnings),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Thu nhập tuần này",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontFamily: 'Quicksand',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            currencyFormat.format(weeklyIncome),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Quicksand',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 30,
+                      color: Colors.white30,
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Công việc tuần này",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontFamily: 'Quicksand',
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "$weeklyJobs công việc",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Quicksand',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            "Danh sách công việc",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Quicksand',
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
   }
 
-  // Calculate monthly income from job profits
-  String _calculateMonthlyIncome(List<Requests> requests) {
-    final now = DateTime.now();
-    final currentMonth = now.month;
-    final currentYear = now.year;
-    int totalIncome = 0;
-
-    for (var req in requests) {
-      if (req.startDate != null) {
-        try {
-          final date = DateTime.parse(req.startDate!);
-          if (date.month == currentMonth && date.year == currentYear) {
-            totalIncome += req.profit.toInt();
-          }
-        } catch (e) {
-          // Skip if date can't be parsed
-        }
-      }
-    }
-
-    // Format as Vietnamese currency
-    return '${totalIncome.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
-  }
-
-
-
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(String status) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.work_off_outlined,
+            _statusInfo[status]?["icon"] ?? Icons.work_off_outlined,
             size: 64,
-            color: Colors.grey[400],
+            color: Colors.grey[300],
           ),
-          Text('${helperRequests.length}'),
           const SizedBox(height: 16),
           Text(
-            "Không có yêu cầu nào",
+            "Không có công việc ${_statusInfo[status]?["label"] ?? ""}",
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               fontFamily: 'Quicksand',
               color: Colors.grey[600],
@@ -419,70 +591,13 @@ class _HomeContentState extends State<HomeContent> {
           ),
           const SizedBox(height: 8),
           Text(
-            "Hiện tại chưa có yêu cầu nào phù hợp với bộ lọc",
+            "Bạn chưa có công việc nào ở trạng thái này",
             style: TextStyle(
               fontSize: 14,
-              fontFamily: 'Quicksand',
               color: Colors.grey[500],
+              fontFamily: 'Quicksand',
             ),
             textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryCard({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 20,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontFamily: 'Quicksand',
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontFamily: 'Quicksand',
-              fontWeight: FontWeight.bold,
-            ),
           ),
         ],
       ),
@@ -497,257 +612,187 @@ class _HomeContentState extends State<HomeContent> {
         DateTime.parse(request.startTime).month,
         DateTime.parse(request.startTime).day);
 
-    String status = request.status;
-    Color statusColor;
+    final statusInfo = _statusInfo[request.status] ??
+        {
+          "color": Colors.grey,
+          "label": "Không xác định",
+          "icon": Icons.help_outline,
+        };
 
-    if (status == "notDone") {
-      statusColor = Colors.red;
-    } else if (status == "assigned") {
-      statusColor = Colors.orange;
-    } else if (status == "processing") {
-      statusColor = Colors.teal;
-    } else if (status == "waitPayment") {
-      statusColor = Colors.blue;
-    } else if (status == "done") {
-      statusColor = Colors.green;
-    } else {
-      statusColor = Colors.grey;
-    }
-
-    String price =
-        '${request.totalCost.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
-
-    String time = "${request.startTime} - ${request.endTime}";
-
-    // Ràng buộc nếu chưa đến ngày thì không được processing hay done detail
-    int index = request.scheduleIds.length; // Mặc định
-    print('giá trị index là $index');
-    if ((status == "processing" || status == 'assigned') &&
+    int index = request.scheduleIds.length; // Default
+    if ((request.status == "processing" || request.status == 'assigned') &&
         start.isAtSameMomentAs(now)) {
       index = now.difference(start).inDays + 1;
     }
 
-    return Container(
+    String formattedDate = '';
+    try {
+      final date = DateTime.parse(request.startTime ?? '');
+      formattedDate = DateFormat('dd/MM/yyyy').format(date);
+    } catch (e) {
+      formattedDate = request.startTime ?? '';
+    }
+
+    return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: statusInfo["color"].withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: statusInfo["color"].withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
             child: Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.cleaning_services,
-                    color: Colors.green,
+                Icon(
+                  statusInfo["icon"],
+                  color: statusInfo["color"],
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  statusInfo["label"],
+                  style: TextStyle(
+                    color: statusInfo["color"],
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Quicksand',
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        request.service.title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontFamily: 'Quicksand',
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        price,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          fontFamily: 'Quicksand',
-                          color: Colors.red[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    getVietnameseStatus(status),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Quicksand',
-                    ),
+                const Spacer(),
+                Text(
+                  formattedDate,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontFamily: 'Quicksand',
                   ),
                 ),
               ],
             ),
           ),
-          Divider(height: 1, color: Colors.grey[200]),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDetailRow(Icons.person,
-                    "Khách hàng: ${request.customerInfo.fullName}"),
-                const SizedBox(height: 8),
-                _buildDetailRow(
-                    Icons.phone, "Điện thoại: ${request.customerInfo.phone}"),
-                const SizedBox(height: 8),
-                _buildDetailRow(Icons.location_city,
-                    "${request.location.ward}, ${request.location.district}, ${request.location.province}"),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection:
-                      Axis.horizontal, // Cuộn ngang nếu nội dung quá dài
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: Colors.grey[600],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(width: 8),
-                      Column(
+                      child: Icon(
+                        _getServiceIcon(request.service.title),
+                        color: Colors.blue,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            "Ngày: ${request.startTime}",
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 15,
-                              fontFamily: 'Quicksand',
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                request.service.title,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Quicksand',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Mã đơn: #${request.id.substring(0, 8)}",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  fontFamily: 'Quicksand',
+                                ),
+                              ),
+                            ],
                           ),
+                          const SizedBox(height: 8),
                           Text(
-                            "Thời gian: ${request.endTime}",
+                            currencyFormat.format(request.totalCost),
                             style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 15,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
                               fontFamily: 'Quicksand',
                             ),
                           ),
                         ],
-                      )
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    if (status == "notDone") ...[
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            _showRejectConfirmationDialog(request);
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: const BorderSide(color: Colors.red),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            "Từ chối",
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontFamily: 'Quicksand',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            _showAcceptConfirmationDialog(request);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            backgroundColor: Colors.green,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            "Nhận việc",
-                            style: TextStyle(
-                              fontFamily: 'Quicksand',
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ] else if (status == "assigned") ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            processingRequest(request, index);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            backgroundColor: Colors.blue,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: const Text(
-                            "Bắt đầu làm việc",
-                            style: TextStyle(
-                              fontFamily: 'Quicksand',
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ] else if (status == "processing") ...[
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            finishRequest(request, index);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            backgroundColor: Colors.green,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            "Hoàn thành (Ngày: $index)",
-                            style: TextStyle(
-                              fontFamily: 'Quicksand',
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
+                const Divider(height: 24),
+                _buildInfoRow(
+                  icon: Icons.person,
+                  label: "Khách hàng",
+                  value: request.customerInfo.fullName,
+                ),
+                _buildInfoRow(
+                  icon: Icons.phone,
+                  label: "Điện thoại",
+                  value: request.customerInfo.phone,
+                ),
+                _buildInfoRow(
+                  icon: Icons.location_on,
+                  label: "Địa chỉ",
+                  value:
+                      "${request.customerInfo.address},${request.location.ward}, ${request.location.district}, ${request.location.province}",
+                ),
+                if (request.scheduleIds.length > 1)
+                  _buildInfoRow(
+                      icon: Icons.access_time,
+                      label: "Ngày thực hiện",
+                      value:
+                          // "${request.startTime?.split(' ')[1] ?? ''} - ${request.endTime?.split(' ')[1] ?? ''}",
+                          // '5',
+                          '${formatDate(request.startTime)} - ${formatDate(request.endTime)}'),
+                if (request.scheduleIds.length == 1)
+                  _buildInfoRow(
+                      icon: Icons.access_time,
+                      label: "Ngày thực hiện",
+                      value:
+                          // "${request.startTime?.split(' ')[1] ?? ''} - ${request.endTime?.split(' ')[1] ?? ''}",
+                          // '5',
+                          '${formatDate(request.startTime)}'),
+                _buildInfoRow(
+                    icon: Icons.access_time,
+                    label: "Thời gian",
+                    value:
+                        // "${request.startTime?.split(' ')[1] ?? ''} - ${request.endTime?.split(' ')[1] ?? ''}",
+                        // '5',
+                        '${formatTime(request.startTime)} - ${formatTime(request.endTime)}'),
+                if (request.scheduleIds.length > 1)
+                  _buildInfoRow(
+                    icon: Icons.calendar_today,
+                    label: "Số ngày",
+                    value: "${request.scheduleIds.length} ngày",
+                    valueColor: Colors.blue[700],
+                  ),
+                const SizedBox(height: 16),
+                _buildActionButtons(request, index),
               ],
             ),
           ),
@@ -756,43 +801,167 @@ class _HomeContentState extends State<HomeContent> {
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: Colors.grey[600],
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: Colors.grey[600],
+          ),
+          const SizedBox(width: 8),
+          Text(
+            "$label: ",
             style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 15,
+              color: Colors.grey[600],
+              fontSize: 14,
               fontFamily: 'Quicksand',
             ),
           ),
-        ),
-      ],
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: valueColor ?? Colors.black87,
+                fontSize: 16,
+                fontFamily: 'Quicksand',
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildActionButtons(Requests request, int index) {
+    switch (request.status) {
+      case "notDone":
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showRejectConfirmationDialog(request),
+                icon: const Icon(Icons.close, size: 16, color: Colors.red),
+                label: const Text(
+                  "Từ chối",
+                  style: TextStyle(
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _showAcceptConfirmationDialog(request),
+                icon: const Icon(
+                  Icons.check,
+                  size: 16,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  "Nhận việc",
+                  style: TextStyle(
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ],
+        );
+      case "assigned":
+        return ElevatedButton.icon(
+          onPressed: () => processingRequest(request, index),
+          // icon: const Icon(Icons.play_arrow, size: 16),
+          label: const Text(
+            "Bắt đầu làm việc",
+            style: TextStyle(
+              fontFamily: 'Quicksand',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 48),
+          ),
+        );
+      case "processing":
+        return ElevatedButton.icon(
+          onPressed: () => finishRequest(request, index),
+          icon: const Icon(
+            Icons.check_circle,
+            size: 16,
+            color: Colors.white,
+          ),
+          label: Text(
+            "Xác nhận hoàn thành công việc",
+            style: TextStyle(
+              fontFamily: 'Quicksand',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 48),
+          ),
+        );
+      case "waitPayment":
+        return ElevatedButton.icon(
+          onPressed: () => finishPayment(request),
+          icon: const Icon(Icons.payments, size: 16),
+          label: const Text(
+            "Xác nhận thanh toán",
+            style: TextStyle(
+              fontFamily: 'Quicksand',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 48),
+          ),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Future<void> _showRejectConfirmationDialog(Requests request) async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // User must tap button to close dialog
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: Text(
+          title: const Text(
             'Xác nhận từ chối',
             style: TextStyle(
-              fontFamily: 'Quicksand',
               fontWeight: FontWeight.bold,
+              fontFamily: 'Quicksand',
             ),
           ),
           content: SingleChildScrollView(
@@ -800,24 +969,19 @@ class _HomeContentState extends State<HomeContent> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Text(
+                const Text(
                   'Bạn có chắc chắn muốn từ chối công việc này?',
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
-                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'Dịch vụ: ${request.service.title}',
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   'Khách hàng: ${request.customerInfo.fullName}',
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -829,41 +993,35 @@ class _HomeContentState extends State<HomeContent> {
               child: Text(
                 'Hủy',
                 style: TextStyle(
-                  fontFamily: 'Quicksand',
                   color: Colors.grey[700],
                 ),
               ),
               onPressed: () {
-                Navigator.of(context).pop;
+                Navigator.of(context).pop();
               },
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text(
+              child: const Text(
                 'Từ chối',
                 style: TextStyle(
-                  fontFamily: 'Quicksand',
-                  color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               onPressed: () {
-                //Handle job rejection logic here
                 cancelRequest(request);
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Đã từ chối công việc thành công',
-                      style: TextStyle(fontFamily: 'Quicksand'),
-                    ),
-                    backgroundColor: Colors.red[700],
-                    duration: const Duration(seconds: 2),
+                  const SnackBar(
+                    content: Text('Đã từ chối công việc thành công'),
+                    backgroundColor: Colors.red,
+                    duration: Duration(seconds: 2),
                   ),
                 );
               },
@@ -877,17 +1035,17 @@ class _HomeContentState extends State<HomeContent> {
   Future<void> _showAcceptConfirmationDialog(Requests request) async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // User must tap button to close dialog
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          title: Text(
+          title: const Text(
             'Xác nhận nhận việc',
             style: TextStyle(
-              fontFamily: 'Quicksand',
               fontWeight: FontWeight.bold,
+              fontFamily: 'Quicksand',
             ),
           ),
           content: SingleChildScrollView(
@@ -895,7 +1053,7 @@ class _HomeContentState extends State<HomeContent> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Text(
+                const Text(
                   'Bạn có chắc chắn muốn nhận công việc này?',
                   style: TextStyle(
                     fontFamily: 'Quicksand',
@@ -904,38 +1062,29 @@ class _HomeContentState extends State<HomeContent> {
                 const SizedBox(height: 12),
                 Text(
                   'Dịch vụ: ${request.service.title}',
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w500,
+                    fontFamily: 'Quicksand',
                   ),
                 ),
                 Text(
                   'Khách hàng: ${request.customerInfo.fullName}',
-                  style: TextStyle(
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
                     fontFamily: 'Quicksand',
+                  ),
+                ),
+                Text(
+                  'Thời gian: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(request.startTime ?? ''))}',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
-                  'Địa chỉ: ${request.customerInfo.address}',
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
+                  'Địa chỉ: ${request.customerInfo.address}, ${request.location.ward}, ${request.location.district}, ${request.location.province}',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  'Thời gian: ${request.startTime} - ${request.endTime}',
-                  style: TextStyle(
                     fontFamily: 'Quicksand',
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  'Tổng tiền: ${request.profit.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ',
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
-                    fontWeight: FontWeight.w500,
-                    color: Colors.green[700],
                   ),
                 ),
               ],
@@ -946,8 +1095,8 @@ class _HomeContentState extends State<HomeContent> {
               child: Text(
                 'Hủy',
                 style: TextStyle(
-                  fontFamily: 'Quicksand',
                   color: Colors.grey[700],
+                  fontFamily: 'Quicksand',
                 ),
               ),
               onPressed: () {
@@ -957,30 +1106,29 @@ class _HomeContentState extends State<HomeContent> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: Text(
+              child: const Text(
                 'Nhận việc',
                 style: TextStyle(
-                  fontFamily: 'Quicksand',
-                  color: Colors.white,
                   fontWeight: FontWeight.bold,
+                  fontFamily: 'Quicksand',
                 ),
               ),
               onPressed: () {
-                // Handle job acceptance logic here
                 assignedRequest(request);
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Đã nhận việc thành công',
-                      style: TextStyle(fontFamily: 'Quicksand'),
-                    ),
-                    backgroundColor: Colors.green[700],
-                    duration: const Duration(seconds: 2),
+                  const SnackBar(
+                    content: Text('Đã nhận công việc thành công',
+                        style: TextStyle(
+                          fontFamily: 'Quicksand',
+                        )),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
                   ),
                 );
               },
@@ -989,5 +1137,57 @@ class _HomeContentState extends State<HomeContent> {
         );
       },
     );
+  }
+
+  IconData _getServiceIcon(String serviceTitle) {
+    // Map service titles to appropriate icons
+    switch (serviceTitle.toLowerCase()) {
+      case 'dọn dẹp nhà cửa':
+      case 'dọn dẹp nhà':
+      case 'vệ sinh nhà':
+        return Icons.cleaning_services;
+      case 'nấu ăn':
+      case 'nấu ăn gia đình':
+        return Icons.restaurant;
+      case 'giặt ủi':
+      case 'giặt đồ':
+        return Icons.local_laundry_service;
+      case 'chăm sóc người già':
+      case 'chăm sóc người cao tuổi':
+        return Icons.elderly;
+      case 'chăm sóc trẻ em':
+      case 'trông trẻ':
+        return Icons.child_care;
+      case 'chăm sóc thú cưng':
+        return Icons.pets;
+      default:
+        return Icons.home_repair_service;
+    }
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Colors.white,
+      child: _tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
   }
 }
