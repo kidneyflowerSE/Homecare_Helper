@@ -145,9 +145,8 @@ class _HomeContentState extends State<HomeContent>
     final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
     return requests.where((req) {
-      if (req.startTime == null) return false;
       try {
-        final jobDate = DateTime.parse(req.startTime!);
+        final jobDate = DateTime.parse(req.startTime);
         return jobDate.isAfter(startOfWeek) &&
             jobDate.isBefore(endOfWeek.add(const Duration(days: 1)));
       } catch (e) {
