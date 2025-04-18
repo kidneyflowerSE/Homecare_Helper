@@ -65,9 +65,9 @@ dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "lib/images/logo.png"  # Đổi thành đường dẫn icon của bạn
+  image_path: "lib/images/logohelper.png"  # Đổi thành đường dẫn icon của bạn
   adaptive_icon_background: "#ffffff"  # Màu nền adaptive icon (Android)
-  adaptive_icon_foreground: "lib/images/logo.png"  # Adaptive icon foreground
+  adaptive_icon_foreground: "lib/images/logohelper.png"  # Adaptive icon foreground
 
 
 dev_dependencies:
