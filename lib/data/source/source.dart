@@ -71,7 +71,7 @@ abstract interface class DataSource {
 class RemoteDataSource implements DataSource {
   @override
   Future<List<Helper>?> loadCleanerData() async {
-    const url = 'https://api.homekare.site/helper/';
+    const url = 'https://homecareapi.vercel.app/helper/';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -92,7 +92,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<Location>?> loadLocationData() async {
-    const url = 'https://api.homekare.site/location';
+    const url = 'https://homecareapi.vercel.app/location';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -115,7 +115,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<Customer>?> loadCustomerData() async {
-    const url = 'https://api.homekare.site/customer';
+    const url = 'https://homecareapi.vercel.app/customer';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -137,7 +137,7 @@ class RemoteDataSource implements DataSource {
   }
 
   Future<void> updateCustomerInfo(Customer customer) async {
-    final url = 'https://api.homekare.site/customer/${customer.phone}';
+    final url = 'https://homecareapi.vercel.app/customer/${customer.phone}';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode(customer.toJson());
@@ -158,7 +158,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<Services>?> loadServicesData() async {
-    const url = 'https://api.homekare.site/service';
+    const url = 'https://homecareapi.vercel.app/service';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -181,7 +181,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<Requests>?> loadRequestData() async {
-    const url = 'https://api.homekare.site/request';
+    const url = 'https://homecareapi.vercel.app/request';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -205,7 +205,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<RequestDetail>?> loadRequestDetailData() async {
-    const url = 'https://api.homekare.site/request';
+    const url = 'https://homecareapi.vercel.app/request';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -235,7 +235,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<RequestDetail>?> getAllRequestDetailOfHelperId(String id) async {
-    String url = 'https://api.homekare.site/requestdetail/helper/$id';
+    String url = 'https://homecareapi.vercel.app/requestdetail/helper/$id';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -261,7 +261,7 @@ class RemoteDataSource implements DataSource {
     if (idString.endsWith(',')) {
       idString = idString.substring(0, idString.length - 1);
     }
-    String url = 'https://api.homekare.site/requestDetail?ids=$idString';
+    String url = 'https://homecareapi.vercel.app/requestDetail?ids=$idString';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -284,7 +284,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<TimeOff>?> loadTimeOffData() async {
-    const url = 'https://api.homekare.site/timeOff/test';
+    const url = 'https://homecareapi.vercel.app/timeOff/test';
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -305,7 +305,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> sendRequests(Requests requests) async {
-    const url = 'https://api.homekare.site/request';
+    const url = 'https://homecareapi.vercel.app/request';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode(requests.toJson());
@@ -330,7 +330,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> cancelRequest(String id) async {
-    final url = 'https://api.homekare.site/request/cancel';
+    final url = 'https://homecareapi.vercel.app/request/cancel';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({'id': id});
@@ -352,7 +352,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> waitPayment(String id) async {
-    final url = 'https://api.homekare.site/request/waitpayment';
+    final url = 'https://homecareapi.vercel.app/request/waitpayment';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({'id': id});
@@ -374,7 +374,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> finishRequest(String id) async {
-    final url = 'https://api.homekare.site/request/finish';
+    final url = 'https://homecareapi.vercel.app/request/finish';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({'detailId': id});
@@ -396,7 +396,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> assignedRequest(String id) async {
-    final url = 'https://api.homekare.site/request/assign';
+    final url = 'https://homecareapi.vercel.app/request/assign';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({'id': id});
@@ -419,7 +419,7 @@ class RemoteDataSource implements DataSource {
   @override
   Future<List<Message>?> loadMessageData(Message message) async {
     final url =
-        Uri.parse('https://api.homekare.site/message?phone=${message.phone}');
+        Uri.parse('https://homecareapi.vercel.app/message?phone=${message.phone}');
     try {
       final response = await http.get(url);
 
@@ -439,7 +439,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> sendMessage(String phone) async {
-    const url = 'https://api.homekare.site/message';
+    const url = 'https://homecareapi.vercel.app/message';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({'phone': phone});
@@ -461,7 +461,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<CostFactor>?> loadCostFactorData() async {
-    final url = "https://api.homekare.site/costFactor";
+    final url = "https://homecareapi.vercel.app/costFactor";
     final uri = Uri.parse(url);
     try {
       final response = await http.get(uri);
@@ -490,7 +490,7 @@ class RemoteDataSource implements DataSource {
       String startDate,
       CoefficientOther coefficientOther,
       num serviceFactor) async {
-    const url = 'https://api.homekare.site/request/calculateCost';
+    const url = 'https://homecareapi.vercel.app/request/calculateCost';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({
@@ -528,7 +528,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<CoefficientOther?> loadCoefficientOther() async {
-    final url = "https://api.homekare.site/costFactor/other";
+    final url = "https://homecareapi.vercel.app/costFactor/other";
     final uri = Uri.parse(url);
 
     try {
@@ -553,7 +553,7 @@ class RemoteDataSource implements DataSource {
   @override
   Future<List<CoefficientOther>?> loadCoefficientService() async {
     const String url =
-        "https://api.homekare.site/costFactor/service"; // Thay bằng URL API thực tế
+        "https://homecareapi.vercel.app/costFactor/service"; // Thay bằng URL API thực tế
     final Uri uri = Uri.parse(url);
 
     try {
@@ -577,7 +577,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> sendCustomerRegisterRequest(Customer customer) async {
-    const url = 'https://api.homekare.site/customer';
+    const url = 'https://homecareapi.vercel.app/customer';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({
@@ -611,7 +611,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> finishPayment(String id) async {
-    final url = 'https://api.homekare.site/request/finishpayment';
+    final url = 'https://homecareapi.vercel.app/request/finishpayment';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({'detailId': id});
@@ -633,7 +633,7 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<void> processingRequest(String id) async {
-    final url = 'https://api.homekare.site/request/processing';
+    final url = 'https://homecareapi.vercel.app/request/processing';
     final uri = Uri.parse(url);
     final headers = {'Content-Type': 'application/json'};
     final body = jsonEncode({'detailId': id});
