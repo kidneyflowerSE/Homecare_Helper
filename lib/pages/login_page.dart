@@ -10,7 +10,6 @@ import 'package:homecare_helper/data/model/request_detail.dart';
 import 'package:homecare_helper/data/model/services.dart';
 import 'package:homecare_helper/data/repository/repository.dart';
 import 'package:homecare_helper/pages/home_page.dart';
-import 'package:homecare_helper/pages/register_page.dart';
 
 class LoginPage extends StatefulWidget {
   final void Function()? onTap;
@@ -45,23 +44,26 @@ class _LoginPageState extends State<LoginPage>
   bool isLoading = false;
   bool isLoginSuccess = false;
 
+  String token = '';
+  String refreshToken = '';
+
   @override
   void initState() {
     super.initState();
     loadData();
     setupAnimations();
-    loadRequestDetailData();
+    // loadRequestDetailData();
     setupFocusListeners();
   }
 
-  Future<void> loadRequestDetailData() async {
-    var repository = DefaultRepository();
-    var data =
-        await repository.getRequestDetailById('66fb6326368eb798fa90aa2f');
-    setState(() {
-      requestDetails = data ?? [];
-    });
-  }
+  // Future<void> loadRequestDetailData() async {
+  //   var repository = DefaultRepository();
+  //   var data =
+  //       await repository.getRequestDetailById('66fb6326368eb798fa90aa2f');
+  //   setState(() {
+  //     requestDetails = data ?? [];
+  //   });
+  // }
 
   void setupAnimations() {
     _animationController = AnimationController(
@@ -128,15 +130,24 @@ class _LoginPageState extends State<LoginPage>
     return null;
   }
 
+  String? validatePassword(String value) {
+    if (value.isEmpty) {
+      return "Mật khẩu không được để trống";
+    }
+    return null;
+  }
+
   Future<void> login() async {
     final phone = phoneController.text.trim();
+    final password = passwordController.text;
 
-    // Validate phone number
+    // Validate phone number và password
     setState(() {
       phoneError = validatePhone(phone);
+      passwordError = validatePassword(password);
     });
 
-    if (phoneError != null) return;
+    if (phoneError != null || passwordError != null) return;
 
     setState(() => isLoading = true);
 
@@ -145,6 +156,16 @@ class _LoginPageState extends State<LoginPage>
       await Future.delayed(const Duration(seconds: 2));
 
       // Check if the phone number matches any helper
+      var repository = DefaultRepository();
+      var authData = await repository.loginHelper(phone, password);
+      if(authData != null) {
+        token = authData.accessToken ?? '';
+        refreshToken = authData.refreshToken ?? '';
+      } else {
+        setState(() => passwordError = "Số điện thoại hoặc mật khẩu không đúng");
+        return;
+      }
+      
       Helper? matchedHelper;
       for (var helper in helpers) {
         if (helper.phone == phone) {
@@ -157,13 +178,14 @@ class _LoginPageState extends State<LoginPage>
       }
 
       if (matchedHelper != null) {
-        // Navigate to the home page with the matched helper's information
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => HomePage(
               helper: matchedHelper!,
               services: services,
+              token: token,
+              refreshToken: refreshToken,
               costFactors: [],
             ),
             transitionsBuilder:
@@ -197,7 +219,6 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
-    print(helpers);
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: Colors.white,
@@ -280,6 +301,25 @@ class _LoginPageState extends State<LoginPage>
                           },
                         ),
 
+                        const SizedBox(height: 20),
+
+                        // Password input
+                        MyTextField(
+                          controller: passwordController,
+                          hintText: "Mật khẩu",
+                          obscureText: true,
+                          keyboardType: TextInputType.text,
+                          errorText: passwordError,
+                          focusNode: passwordFocusNode,
+                          onChanged: (value) {
+                            // if (passwordError != null) {
+                            //   setState(() {
+                            //     passwordError = validatePassword(value);
+                            //   });
+                            // }
+                          },
+                        ),
+
                         const SizedBox(height: 25),
 
                         // Login button
@@ -313,38 +353,6 @@ class _LoginPageState extends State<LoginPage>
                         ),
 
                         const SizedBox(height: 20),
-
-                        // Register link
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text(
-                              "Chưa có tài khoản?",
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.black,
-                                fontFamily: 'Quicksand',
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const RegisterPage(),
-                                ),
-                              ),
-                              child: const Text(
-                                " Đăng ký",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Quicksand',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   ),

@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:homecare_helper/data/model/request.dart';
+import 'package:homecare_helper/data/model/RequestHelper.dart';
 import 'package:intl/intl.dart';
 
-class OrderDetailPage extends StatelessWidget {
-  final Requests request;
+class OrderDetailPage extends StatefulWidget {
+  final RequestHelper request;
 
   const OrderDetailPage({Key? key, required this.request}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final bool isCompleted = request.status == "completed";
-    final statusText = isCompleted ? "Hoàn thành" : "Đã hủy";
-    final statusColor = isCompleted ? Colors.green : Colors.red;
+  State<OrderDetailPage> createState() => _OrderDetailPageState();
+}
 
+class _OrderDetailPageState extends State<OrderDetailPage> {
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -25,579 +26,425 @@ class OrderDetailPage extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-        iconTheme: IconThemeData(color: Colors.white),
         backgroundColor: Colors.green,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // // Status Banner
-            // Container(
-            //   width: double.infinity,
-            //   padding: const EdgeInsets.symmetric(vertical: 16),
-            //   color: statusColor.withOpacity(0.1),
-            //   child: Column(
-            //     children: [
-            //       Icon(
-            //         isCompleted ? Icons.check_circle : Icons.cancel,
-            //         color: statusColor,
-            //         size: 48,
-            //       ),
-            //       const SizedBox(height: 8),
-            //       Text(
-            //         statusText,
-            //         style: TextStyle(
-            //           color: statusColor,
-            //           fontSize: 18,
-            //           fontWeight: FontWeight.bold,
-            //           fontFamily: 'Quicksand',
-            //         ),
-            //       ),
-            //       const SizedBox(height: 4),
-            //       Text(
-            //         "Mã đơn: ${request.id}",
-            //         style: TextStyle(
-            //           color: Colors.grey[700],
-            //           fontSize: 14,
-            //           fontFamily: 'Quicksand',
-            //         ),
-            //       ),
-            //     ],
-            //   ),
-            // ),
-
-            _buildTimelineView(),
-
-            // Service Information
-            _buildSection(
-              title: "Thông tin dịch vụ",
-              icon: Icons.cleaning_services,
-              children: [
-                _buildInfoRow("Loại dịch vụ", request.service.title),
-                _buildInfoRow(
-                    "Loại yêu cầu", _formatRequestType(request.requestType)),
-                _buildInfoRow("Ngày đặt", _formatDate(request.oderDate)),
-                if (request.startDate != null)
-                  _buildInfoRow(
-                      "Ngày bắt đầu", _formatDate(request.startDate!)),
-                _buildInfoRow(
-                    "Thời gian", "${request.startTime} - ${request.endTime}"),
-                _buildInfoRow("Hệ số dịch vụ",
-                    request.service.coefficientService.toString()),
-                _buildInfoRow(
-                    "Hệ số khác", request.service.coefficientOther.toString()),
-              ],
-            ),
+            // Order Status Header
+            _buildStatusCard(),
+            const SizedBox(height: 16),
 
             // Customer Information
-            _buildSection(
-              title: "Thông tin khách hàng",
-              icon: Icons.person,
-              children: [
-                _buildInfoRow("Tên khách hàng", request.customerInfo.fullName),
-                _buildInfoRow("Số điện thoại", request.customerInfo.phone),
-                _buildInfoRow("Địa chỉ", request.customerInfo.address),
-                _buildInfoRow(
-                    "Điểm sử dụng", "${request.customerInfo.usedPoint} điểm"),
-              ],
-            ),
+            _buildInfoCard("Thông tin khách hàng", [
+              _buildInfoRow("Họ và tên", widget.request.customerInfo.fullName, Icons.person),
+              _buildInfoRow("Số điện thoại", widget.request.customerInfo.phone, Icons.phone),
+              _buildInfoRow("Địa chỉ", widget.request.customerInfo.address, Icons.location_on),
+              _buildInfoRow("Điểm đã sử dụng", "${widget.request.customerInfo.usedPoint} điểm", Icons.stars),
+            ]),
 
-            // Location Information
-            _buildSection(
-              title: "Địa chỉ thực hiện",
-              icon: Icons.location_on,
-              children: [
-                _buildInfoRow("Tỉnh/Thành phố", request.location.province),
-                _buildInfoRow("Quận/Huyện", request.location.district),
-                _buildInfoRow("Phường/Xã", request.location.ward),
-              ],
-            ),
+            const SizedBox(height: 16),
 
-            // Financial Information
-            _buildSection(
-              title: "Thông tin thanh toán",
-              icon: Icons.attach_money,
-              children: [
-                _buildInfoRow(
-                    "Chi phí dịch vụ", _formatCurrency(request.service.cost)),
-                _buildInfoRow(
-                    "Tổng chi phí", _formatCurrency(request.totalCost)),
-                _buildInfoRow("Lợi nhuận", _formatCurrency(request.profit)),
-              ],
-            ),
+            // Service Information
+            _buildInfoCard("Thông tin dịch vụ", [
+              _buildInfoRow("Tên dịch vụ", widget.request.service.title, Icons.home_repair_service),
+              _buildInfoRow("Giá cơ bản", "${NumberFormat('#,###').format(widget.request.service.cost)} VNĐ", Icons.attach_money),
+              _buildInfoRow("Hệ số dịch vụ", "x${widget.request.service.coefficientService}", Icons.trending_up),
+              _buildInfoRow("Hệ số khác", "x${widget.request.service.coefficientOther}", Icons.trending_up),
+              _buildInfoRow("Hệ số OT", "x${widget.request.service.coefficientOt}", Icons.access_time),
+            ]),
 
-            // Schedule Information
-            _buildSection(
-              title: "Lịch trình",
-              icon: Icons.schedule,
-              children: [
-                _buildInfoRow("Mã lịch trình", request.scheduleIds.join(", ")),
-                if (request.helperId != null)
-                  _buildInfoRow("Mã nhân viên", request.helperId!),
-              ],
-            ),
+            const SizedBox(height: 16),
 
-            // Feedback and Comments
-            _buildSection(
-              title: "Đánh giá & Phản hồi",
-              icon: Icons.rate_review,
-              children: [
-                _buildInfoRow(
-                    "Đánh giá",
-                    request.comment.review.isEmpty
-                        ? "Chưa có đánh giá"
-                        : request.comment.review),
-                _buildInfoRow("Mất mát đồ đạc",
-                    request.comment.loseThings ? "Có" : "Không"),
-                _buildInfoRow("Hư hỏng đồ đạc",
-                    request.comment.breakThings ? "Có" : "Không"),
+            // Order Information
+            _buildInfoCard("Thông tin đơn hàng", [
+              _buildInfoRow("Mã đơn hàng", widget.request.id, Icons.receipt),
+              _buildInfoRow("Ngày đặt", _formatDate(widget.request.orderDate), Icons.calendar_today),
+              _buildInfoRow("Thời gian bắt đầu", _formatDateTime(widget.request.startTime), Icons.schedule),
+              _buildInfoRow("Thời gian kết thúc", _formatDateTime(widget.request.endTime), Icons.schedule_outlined),
+              _buildInfoRow("Tổng chi phí", "${NumberFormat('#,###').format(widget.request.totalCost)} VNĐ", Icons.payment),
+            ]),
 
-                // Rating Stars
-                if (isCompleted) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        "Số sao: ",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                          fontFamily: 'Quicksand',
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Row(
-                        children: List.generate(5, (index) {
-                          // Assuming rating is from 1-5 stars
-                          // Using a mock rating based on the request ID
-                          final int rating = int.parse(request.id) % 5 + 1;
-                          return Icon(
-                            index < rating ? Icons.star : Icons.star_border,
-                            color: Colors.amber,
-                            size: 20,
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
+            const SizedBox(height: 16),
+
+            // Schedules List
+            _buildSchedulesCard(),
+
+            const SizedBox(height: 24),
 
             // Action Buttons
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Handle printing or sharing the order details
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text("Đang in thông tin đơn hàng...")),
-                        );
-                      },
-                      icon: const Icon(Icons.print, color: Colors.white),
-                      label: const Text(
-                        "In thông tin đơn hàng",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'Quicksand',
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      icon: const Icon(Icons.arrow_back, color: Colors.green),
-                      label: const Text(
-                        "Quay lại",
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontFamily: 'Quicksand',
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(
-                          color: Colors.green,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildActionButtons(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTimelineView() {
-    // Lấy trạng thái từ widget.request (có thể thay đổi tùy theo dữ liệu của bạn)
-    // String orderStatus = widget.request.status;
-    String orderStatus = 'assigned';
+  Widget _buildStatusCard() {
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (widget.request.status.toLowerCase()) {
+      case 'pending':
+        statusColor = Colors.orange;
+        statusIcon = Icons.schedule;
+        statusText = 'Chờ xử lý';
+        break;
+      case 'confirmed':
+        statusColor = Colors.blue;
+        statusIcon = Icons.check_circle;
+        statusText = 'Đã xác nhận';
+        break;
+      case 'in_progress':
+        statusColor = Colors.green;
+        statusIcon = Icons.work;
+        statusText = 'Đang thực hiện';
+        break;
+      case 'completed':
+        statusColor = Colors.green[700]!;
+        statusIcon = Icons.check_circle_outline;
+        statusText = 'Hoàn thành';
+        break;
+      case 'cancelled':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        statusText = 'Đã hủy';
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help;
+        statusText = widget.request.status;
+    }
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: statusColor, width: 2),
       ),
       child: Row(
-        // crossAxisAlignment: CrossAxisAlignment.start,
-        // mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          _buildTimelineItem(
-            title: 'Đã đặt đơn',
-            // time: _formatDate(widget.request.oderDate),
-            time: '55',
-            isActive: true,
-            isFirst: true,
+          Icon(statusIcon, color: statusColor, size: 32),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Trạng thái đơn hàng',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+              ],
+            ),
           ),
-          if (orderStatus == 'assigned') ...[
-            _buildTimelineItem(
-              title: 'Đã xác nhận',
-              time: 'Hoàn thành',
-              isActive: true,
-            ),
-            _buildTimelineItem(
-              title: 'Đang thực hiện',
-              time: 'Đang chờ',
-              isActive: false,
-            ),
-            _buildTimelineItem(
-              title: 'Đã hoàn thành',
-              time: 'Đang chờ',
-              isActive: false,
-              isLast: true,
-            ),
-          ],
-          if (orderStatus == 'processing') ...[
-            _buildTimelineItem(
-              title: 'Đã xác nhận',
-              time: 'Hoàn thành',
-              isActive: true,
-            ),
-            _buildTimelineItem(
-              title: 'Đang thực hiện',
-              time: 'Hoàn thành',
-              isActive: true,
-            ),
-            _buildTimelineItem(
-              title: 'Đã hoàn thành',
-              time: 'Đang chờ',
-              isActive: false,
-              isLast: true,
-            ),
-          ],
-          if (orderStatus == 'done') ...[
-            _buildTimelineItem(
-              title: 'Đã xác nhận',
-              time: 'Hoàn thành',
-              isActive: true,
-            ),
-            _buildTimelineItem(
-              title: 'Đang thực hiện',
-              time: 'Hoàn thành',
-              isActive: true,
-            ),
-            _buildTimelineItem(
-              title: 'Đã hoàn thành',
-              time: 'Hoàn thành',
-              isActive: true,
-              isLast: true,
-            ),
-          ],
-          if (orderStatus == 'cancelled')
-            _buildTimelineItem(
-              title: 'Đơn bị huỷ',
-              time: 'Đã huỷ',
-              isActive: true,
-              isLast: true,
-              isCancelled: true,
-            ),
         ],
       ),
     );
   }
 
-  Widget _buildTimelineItem({
-    required String title,
-    required String time,
-    required bool isActive,
-    bool isFirst = false,
-    bool isLast = false,
-    bool isCancelled = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          // mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildInfoCard(String title, List<Widget> children) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: isCancelled
-                    ? Colors.red
-                    : (isActive ? Colors.green : Colors.grey.shade300),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCancelled
-                      ? Colors.red.shade100
-                      : (isActive ? Colors.green.shade100 : Colors.white),
-                  width: 3,
-                ),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Quicksand',
               ),
-              child: isActive || isCancelled
-                  ? const Icon(Icons.check, color: Colors.white, size: 12)
-                  : null,
             ),
-            // Text('hehee'),
-            const SizedBox(width: 10),
-
-            if (!isLast)
-              Container(
-                height: 2,
-                width: 40,
-                color: isCancelled
-                    ? Colors.red
-                    : (isActive ? Colors.green : Colors.grey.shade300),
-                margin: const EdgeInsets.symmetric(vertical: 4),
-              ),
+            const SizedBox(height: 16),
+            ...children,
           ],
         ),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isCancelled
-                ? Colors.red
-                : (isActive ? Colors.black : Colors.grey),
-            fontFamily: 'Quicksand',
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          time,
-          style: TextStyle(
-            fontSize: 13,
-            color: isCancelled
-                ? Colors.red
-                : (isActive ? Colors.green : Colors.grey),
-            fontFamily: 'Quicksand',
-          ),
-        ),
-        // SizedBox(height: isLast ? 0 : 20),
-      ],
+      ),
     );
   }
 
-  // Widget _buildTimelineItem({
-  //   required String title,
-  //   required String time,
-  //   required bool isActive,
-  //   bool isFirst = false,
-  //   bool isLast = false,
-  //   bool isCancelled = false,
-  // }) {
-  //   return Row(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: [
-  //       SizedBox(
-  //         width: 30,
-  //         child: Column(
-  //           children: [
-  //             Container(
-  //               width: 20,
-  //               height: 20,
-  //               decoration: BoxDecoration(
-  //                 color: isCancelled
-  //                     ? Colors.red
-  //                     : (isActive ? Colors.green : Colors.grey.shade300),
-  //                 shape: BoxShape.circle,
-  //                 border: Border.all(
-  //                   color: isCancelled
-  //                       ? Colors.red.shade100
-  //                       : (isActive ? Colors.green.shade100 : Colors.white),
-  //                   width: 3,
-  //                 ),
-  //               ),
-  //               child: isActive || isCancelled
-  //                   ? const Icon(Icons.check, color: Colors.white, size: 12)
-  //                   : null,
-  //             ),
-  //             if (!isLast)
-  //               Container(
-  //                 width: 2,
-  //                 height: 40,
-  //                 color: isCancelled
-  //                     ? Colors.red
-  //                     : (isActive ? Colors.green : Colors.grey.shade300),
-  //                 margin: const EdgeInsets.symmetric(vertical: 4),
-  //               ),
-  //           ],
-  //         ),
-  //       ),
-  //       const SizedBox(width: 10),
-  //       Expanded(
-  //         child: Column(
-  //           crossAxisAlignment: CrossAxisAlignment.start,
-  //           children: [
-  //             Text(
-  //               title,
-  //               style: TextStyle(
-  //                 fontSize: 15,
-  //                 fontWeight: FontWeight.w600,
-  //                 color: isCancelled
-  //                     ? Colors.red
-  //                     : (isActive ? Colors.black : Colors.grey),
-  //                 fontFamily: 'Quicksand',
-  //               ),
-  //             ),
-  //             const SizedBox(height: 4),
-  //             Text(
-  //               time,
-  //               style: TextStyle(
-  //                 fontSize: 13,
-  //                 color: isCancelled
-  //                     ? Colors.red
-  //                     : (isActive ? Colors.green : Colors.grey),
-  //                 fontFamily: 'Quicksand',
-  //               ),
-  //             ),
-  //             SizedBox(height: isLast ? 0 : 20),
-  //           ],
-  //         ),
-  //       ),
-  //     ],
-  //   );
-  // }
-
-  Widget _buildSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  Widget _buildInfoRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.grey[600], size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSchedulesCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Lịch trình công việc',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Quicksand',
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${widget.request.schedules.length} ca làm',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (widget.request.schedules.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'Chưa có lịch trình nào được tạo',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontFamily: 'Quicksand',
+                    ),
+                  ),
+                ),
+              )
+            else
+              ...widget.request.schedules.map((schedule) => _buildScheduleItem(schedule)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleItem(Schedule schedule) {
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+
+    switch (schedule.status.toLowerCase()) {
+      case 'pending':
+        statusColor = Colors.orange;
+        statusIcon = Icons.schedule;
+        statusText = 'Chờ thực hiện';
+        break;
+      case 'in_progress':
+        statusColor = Colors.blue;
+        statusIcon = Icons.work;
+        statusText = 'Đang thực hiện';
+        break;
+      case 'completed':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        statusText = 'Hoàn thành';
+        break;
+      case 'cancelled':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        statusText = 'Đã hủy';
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help;
+        statusText = schedule.status;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
+          Row(
+            children: [
+              Icon(statusIcon, color: statusColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Quicksand',
+                ),
+              ),
+              const Spacer(),
+              Text(
+                "${NumberFormat('#,###').format(schedule.helperCost)} VNĐ",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+              const SizedBox(width: 4),
+              Text(_formatDate(schedule.workingDate)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.access_time, size: 16, color: Colors.grey),
+              const SizedBox(width: 4),
+              Text('${_formatTime(schedule.startTime)} - ${_formatTime(schedule.endTime)}'),
+            ],
+          ),
+          if (schedule.comment.review.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Đánh giá:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Text(schedule.comment.review),
+                  if (schedule.comment.loseThings || schedule.comment.breakThings) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (schedule.comment.loseThings)
+                          const Chip(
+                            label: Text('Làm mất đồ', style: TextStyle(fontSize: 10)),
+                            backgroundColor: Colors.red,
+                            labelStyle: TextStyle(color: Colors.white),
+                          ),
+                        if (schedule.comment.breakThings) ...[
+                          if (schedule.comment.loseThings) const SizedBox(width: 8),
+                          const Chip(
+                            label: Text('Làm hỏng đồ', style: TextStyle(fontSize: 10)),
+                            backgroundColor: Colors.orange,
+                            labelStyle: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Icon(icon, color: Colors.green, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Quicksand',
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Section content
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-                fontFamily: 'Quicksand',
+  Widget _buildActionButtons() {
+    return Row(
+      children: [
+        if (widget.request.status.toLowerCase() == 'pending') ...[
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => _showCancelDialog(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
               ),
+              child: const Text('Hủy đơn'),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 16),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                fontFamily: 'Quicksand',
-              ),
+            child: ElevatedButton(
+              onPressed: () => _confirmOrder(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('Xác nhận', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        ] else if (widget.request.status.toLowerCase() == 'confirmed') ...[
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _startWork(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+              child: const Text('Bắt đầu làm việc', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        ] else if (widget.request.status.toLowerCase() == 'in_progress') ...[
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _completeWork(),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('Hoàn thành', style: TextStyle(color: Colors.white)),
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
@@ -610,13 +457,64 @@ class OrderDetailPage extends StatelessWidget {
     }
   }
 
+  String _formatDateTime(DateTime dateTime) {
+    return DateFormat('dd/MM/yyyy HH:mm').format(dateTime);
+  }
+
+  String _formatTime(DateTime dateTime) {
+    return DateFormat('HH:mm').format(dateTime);
+  }
+
+  void _showCancelDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận hủy'),
+        content: const Text('Bạn có chắc chắn muốn hủy đơn hàng này?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Không'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Đã hủy đơn hàng')),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Hủy đơn'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmOrder() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã xác nhận đơn hàng')),
+    );
+  }
+
+  void _startWork() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã bắt đầu làm việc')),
+    );
+  }
+
+  void _completeWork() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã hoàn thành công việc')),
+    );
+  }
+
   String _formatCurrency(num amount) {
-    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
-    return formatter.format(amount);
+    return NumberFormat('#,###').format(amount) + ' VNĐ';
   }
 
   String _formatRequestType(String requestType) {
-    switch (requestType) {
+    switch (requestType.toLowerCase()) {
       case 'short_term':
         return 'Ngắn hạn';
       case 'long_term':

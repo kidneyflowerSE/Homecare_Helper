@@ -20,55 +20,79 @@ class Helper {
   String? educationLevel;
   num height;
   num weight;
+  String? status;
+  String? workingStatus;
 
   Helper({
     required this.id,
-    required this.helperId,
-    required this.fullName,
-    required this.startDate,
-    required this.birthDay,
-    required this.phone,
-    required this.birthPlace,
-    required this.address,
+    this.helperId,
+    this.fullName,
+    this.startDate,
+    this.birthDay,
+    this.phone,
+    this.birthPlace,
+    this.address,
     required this.workingArea,
-    required this.jobDetail,
+    this.jobDetail,
     required this.jobs,
     required this.yearOfExperience,
-    required this.experienceDescription,
-    required this.avatar,
+    this.experienceDescription,
+    this.avatar,
     required this.healthCertificates,
-    required this.salaryId,
-    required this.gender,
-    required this.nationality,
-    required this.educationLevel,
+    this.salaryId,
+    this.gender,
+    this.nationality,
+    this.educationLevel,
     required this.height,
     required this.weight,
+    this.status,
+    this.workingStatus,
   });
 
   factory Helper.fromJson(Map<String, dynamic> map) {
-    return Helper(
-      id: map['_id'],
-      helperId: map['helper_id'],
-      fullName: map['fullName'],
-      startDate: map['startDate'],
-      birthDay: map['birthDate'],
-      phone: map['phone'],
-      birthPlace: map['birthPlace'],
-      address: map['address'],
-      workingArea: WorkingArea.fromJson(map['workingArea']),
-      jobDetail: map['jobDetail'],
-      jobs: List<String>.from(map['jobs']),
-      yearOfExperience: map['yearOfExperience'],
-      experienceDescription: map['experienceDescription'],
-      avatar: map['avatar'],
-      healthCertificates: List<String>.from(map['healthCertificates']),
-      salaryId: map['salaryId'],
-      gender: map['gender'],
-      nationality: map['nationality'],
-      educationLevel: map['educationLevel'],
-      height: map['height'].toDouble(), // Convert to double
-      weight: map['weight'].toDouble(), // Convert to double
-    );
+    try {
+      return Helper(
+        id: map['_id']?.toString() ?? '',
+        helperId: map['helper_id']?.toString(),
+        fullName: map['fullName']?.toString(),
+        startDate: map['startDate']?.toString(),
+        birthDay: map['birthDate']?.toString(),
+        phone: map['phone']?.toString(),
+        birthPlace: map['birthPlace']?.toString(),
+        address: map['address']?.toString(),
+        workingArea: map['workingArea'] != null && map['workingArea'] is Map<String, dynamic>
+            ? WorkingArea.fromJson(map['workingArea'])
+            : WorkingArea(province: '', districts: []),
+        jobDetail: map['jobDetail']?.toString(),
+        jobs: map['jobs'] != null && map['jobs'] is List
+            ? List<String>.from(map['jobs'].map((item) => item.toString()))
+            : [],
+        yearOfExperience: map['yearOfExperience'] is num
+            ? map['yearOfExperience']
+            : (num.tryParse(map['yearOfExperience']?.toString() ?? '0') ?? 0),
+        experienceDescription: map['experienceDescription']?.toString(),
+        avatar: map['avatar']?.toString(),
+        healthCertificates: map['healthCertificates'] != null && map['healthCertificates'] is List
+            ? List<String>.from(map['healthCertificates'].map((item) => item.toString()))
+            : [],
+        salaryId: map['salaryId']?.toString(),
+        gender: map['gender']?.toString(),
+        nationality: map['nationality']?.toString(),
+        educationLevel: map['educationLevel']?.toString(),
+        height: map['height'] is num
+            ? map['height']
+            : (num.tryParse(map['height']?.toString() ?? '0') ?? 0),
+        weight: map['weight'] is num
+            ? map['weight']
+            : (num.tryParse(map['weight']?.toString() ?? '0') ?? 0),
+        status: map['status']?.toString(),
+        workingStatus: map['workingStatus']?.toString(),
+      );
+    } catch (e) {
+      print('Error parsing Helper from JSON: $e');
+      print('Problematic JSON: $map');
+      rethrow;
+    }
   }
 
   @override
@@ -144,27 +168,3 @@ class WorkingArea {
     return 'WorkingArea{province: $province, districts: $districts}';
   }
 }
-
-// class CreatedBy {
-//   String accountId;
-//   DateTime dateTime;
-//
-//   CreatedBy({required this.accountId, DateTime? dateTime}) :
-//       dateTime = dateTime ?? DateTime.now();
-// }
-//
-// class UpdatedBy {
-//   String accountId;
-//   DateTime updateAt;
-//
-//   UpdatedBy({required this.accountId, DateTime? updateAt}) :
-//       updateAt = updateAt ?? DateTime.now();
-// }
-//
-// class DeletedBy {
-//   String accountId;
-//   DateTime deletedAt;
-//
-//   DeletedBy({required this.accountId, DateTime? deletedAt}) :
-//       deletedAt = deletedAt ?? DateTime.now();
-// }

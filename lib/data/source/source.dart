@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:homecare_helper/data/model/RequestHelper.dart';
 import 'package:homecare_helper/data/model/coefficient.dart';
 import 'package:homecare_helper/data/model/cost_factor.dart';
 import 'package:homecare_helper/data/model/customer.dart';
@@ -15,6 +16,8 @@ import 'package:homecare_helper/data/model/services.dart';
 import 'package:homecare_helper/data/model/time_off.dart';
 
 import 'package:http/http.dart' as http;
+
+import '../model/Authen.dart';
 
 abstract interface class DataSource {
   Future<List<Helper>?> loadCleanerData();
@@ -29,19 +32,17 @@ abstract interface class DataSource {
 
   Future<List<RequestDetail>?> loadRequestDetailData();
 
-  Future<List<RequestDetail>?> getAllRequestDetailOfHelperId(String id);
-
   Future<void> sendRequests(Requests requests);
 
   Future<void> cancelRequest(String id);
 
-  Future<void> finishRequest(String id);
+  Future<void> finishRequest(String id, String token);
 
-  Future<void> assignedRequest(String id);
+  Future<void> assignedRequest(String id, String token);
 
-  Future<void> processingRequest(String id);
+  Future<void> processingRequest(String id, String token);
 
-  Future<void> finishPayment(String id);
+  Future<void> finishPayment(String id, String token);
 
   Future<void> waitPayment(String id);
 
@@ -66,6 +67,15 @@ abstract interface class DataSource {
       String startDate,
       CoefficientOther coefficientOther,
       num serviceFactor);
+
+  Future<Authen?> loginHelper(String phone, String password);
+
+  Future<Authen?> registerHelper(String phone, String password, String name,
+      String email, Addresses addresses);
+
+  Future<List<RequestHelper>?> loadUnassignedRequest(String token);
+
+  Future<List<RequestHelper>?> loadAssignedRequest(String token);
 }
 
 class RemoteDataSource implements DataSource {
@@ -78,7 +88,21 @@ class RemoteDataSource implements DataSource {
       if (response.statusCode == 200) {
         final bodyContent = utf8.decode(response.bodyBytes);
         final List<dynamic> cleanerList = jsonDecode(bodyContent);
-        return cleanerList.map((cleaner) => Helper.fromJson(cleaner)).toList();
+
+        List<Helper> helpers = [];
+        for (int i = 0; i < cleanerList.length; i++) {
+          try {
+            final helper = Helper.fromJson(cleanerList[i]);
+            helpers.add(helper);
+          } catch (e) {
+            print('Error parsing helper at index $i: $e');
+            print('Helper data: ${cleanerList[i]}');
+            // Continue with other helpers instead of failing completely
+            continue;
+          }
+        }
+
+        return helpers;
       } else {
         print(
             'Failed to load cleaner data. Status code: ${response.statusCode}');
@@ -233,29 +257,6 @@ class RemoteDataSource implements DataSource {
     }
   }
 
-  @override
-  Future<List<RequestDetail>?> getAllRequestDetailOfHelperId(String id) async {
-    String url = 'https://homecareapi.vercel.app/requestdetail/helper/$id';
-    final uri = Uri.parse(url);
-    try {
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final bodyContent = utf8.decode(response.bodyBytes);
-        final List<dynamic> detailsList = jsonDecode(bodyContent);
-        return detailsList
-            .map((detail) => RequestDetail.fromJson(detail))
-            .toList();
-      } else {
-        print(
-            'Failed to load request detail IDs. Status code: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('Error loading request detail IDs: $e');
-      return null;
-    }
-  }
-
   Future<List<RequestDetail>?> loadRequestDetailId(List<String> id) async {
     String idString = id.join(',');
     if (idString.endsWith(',')) {
@@ -373,10 +374,13 @@ class RemoteDataSource implements DataSource {
   }
 
   @override
-  Future<void> finishRequest(String id) async {
+  Future<void> finishRequest(String id, String token) async {
     final url = 'https://homecareapi.vercel.app/request/finish';
     final uri = Uri.parse(url);
-    final headers = {'Content-Type': 'application/json'};
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token'
+    };
     final body = jsonEncode({'detailId': id});
     try {
       final response = await http.post(uri, headers: headers, body: body);
@@ -395,11 +399,14 @@ class RemoteDataSource implements DataSource {
   }
 
   @override
-  Future<void> assignedRequest(String id) async {
+  Future<void> assignedRequest(String id, String token) async {
     final url = 'https://homecareapi.vercel.app/request/assign';
     final uri = Uri.parse(url);
-    final headers = {'Content-Type': 'application/json'};
-    final body = jsonEncode({'id': id});
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token'
+    };
+    final body = jsonEncode({'detailId': id});
     try {
       final response = await http.post(uri, headers: headers, body: body);
 
@@ -418,8 +425,8 @@ class RemoteDataSource implements DataSource {
 
   @override
   Future<List<Message>?> loadMessageData(Message message) async {
-    final url =
-        Uri.parse('https://homecareapi.vercel.app/message?phone=${message.phone}');
+    final url = Uri.parse(
+        'https://homecareapi.vercel.app/message?phone=${message.phone}');
     try {
       final response = await http.get(url);
 
@@ -610,10 +617,13 @@ class RemoteDataSource implements DataSource {
   }
 
   @override
-  Future<void> finishPayment(String id) async {
+  Future<void> finishPayment(String id, String token) async {
     final url = 'https://homecareapi.vercel.app/request/finishpayment';
     final uri = Uri.parse(url);
-    final headers = {'Content-Type': 'application/json'};
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token'
+    };
     final body = jsonEncode({'detailId': id});
     try {
       final response = await http.post(uri, headers: headers, body: body);
@@ -632,10 +642,13 @@ class RemoteDataSource implements DataSource {
   }
 
   @override
-  Future<void> processingRequest(String id) async {
+  Future<void> processingRequest(String id, String token) async {
     final url = 'https://homecareapi.vercel.app/request/processing';
     final uri = Uri.parse(url);
-    final headers = {'Content-Type': 'application/json'};
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token'
+    };
     final body = jsonEncode({'detailId': id});
     try {
       final response = await http.post(uri, headers: headers, body: body);
@@ -650,6 +663,128 @@ class RemoteDataSource implements DataSource {
       }
     } catch (e) {
       print('Error posting requests: $e');
+    }
+  }
+
+  @override
+  Future<Authen?> loginHelper(String phone, String password) {
+    const url = 'https://homecareapi.vercel.app/auth/login/helper';
+    final uri = Uri.parse(url);
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({
+      "phone": phone,
+      "password": password,
+    });
+
+    try {
+      return http.post(uri, headers: headers, body: body).then((response) {
+        if (response.statusCode == 200) {
+          final bodyContent = utf8.decode(response.bodyBytes);
+          final Map<String, dynamic> authMap = jsonDecode(bodyContent);
+          final Authen auth = Authen.fromJson(authMap);
+          return auth;
+        } else {
+          print('Failed to authenticate. Status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
+        }
+        return null;
+      });
+    } catch (e) {
+      print('Error during authentication: $e');
+      return Future.error(e);
+    }
+  }
+
+  @override
+  Future<Authen?> registerHelper(String phone, String password, String name,
+      String email, Addresses addresses) {
+    const url = 'https://homecareapi.vercel.app/auth/register/helper';
+    final uri = Uri.parse(url);
+    final headers = {'Content-Type': 'application/json'};
+    final body = jsonEncode({
+      "fullName": name,
+      "phone": phone,
+      "password": password,
+      "email": email,
+      "address": addresses.toJson(),
+    });
+
+    try {
+      return http.post(uri, headers: headers, body: body).then((response) {
+        if (response.statusCode == 201) {
+          final bodyContent = utf8.decode(response.bodyBytes);
+          final Map<String, dynamic> authenMap = jsonDecode(bodyContent);
+          final Authen authen = Authen.fromJson(authenMap);
+          return authen;
+        } else {
+          print('Failed to register. Status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
+          return Future.error('Failed to register');
+        }
+      });
+    } catch (e) {
+      print('Error during registration: $e');
+      return Future.error(e);
+    }
+  }
+
+  @override
+  Future<List<RequestHelper>?> loadUnassignedRequest(String token) {
+    final url = "https://homecareapi.vercel.app/request";
+    final uri = Uri.parse(url);
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+    try {
+      return http.get(uri, headers: headers).then((response) {
+        if (response.statusCode == 200) {
+          final bodyContent = utf8.decode(response.bodyBytes);
+          final List<dynamic> requestList = jsonDecode(bodyContent);
+          print('body: $bodyContent');
+          return requestList
+              .map((request) => RequestHelper.fromJson(request))
+              .toList();
+        } else {
+          print(
+              'Failed to load unassigned requests. Status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
+          return null;
+        }
+      });
+    } catch (e) {
+      print('Error loading unassigned requests: $e');
+      return Future.error(e);
+    }
+  }
+
+  @override
+  Future<List<RequestHelper>?> loadAssignedRequest(String token) {
+    final url = "https://homecareapi.vercel.app/request/my-assigned";
+    final uri = Uri.parse(url);
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+    try {
+      return http.get(uri, headers: headers).then((response) {
+        if (response.statusCode == 200) {
+          final bodyContent = utf8.decode(response.bodyBytes);
+          final List<dynamic> requestList = jsonDecode(bodyContent);
+          print('body: $bodyContent');
+          return requestList
+              .map((request) => RequestHelper.fromJson(request))
+              .toList();
+        } else {
+          print(
+              'Failed to load assigned requests. Status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
+          return null;
+        }
+      });
+    } catch (e) {
+      print('Error loading assigned requests: $e');
+      return Future.error(e);
     }
   }
 }

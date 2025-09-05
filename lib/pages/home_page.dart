@@ -17,12 +17,16 @@ class HomePage extends StatefulWidget {
   final Helper helper;
   final List<CostFactor> costFactors;
   final List<Services> services;
+  final String token;
+  final String refreshToken;
 
   const HomePage({
     super.key,
     required this.helper,
     required this.costFactors,
     required this.services,
+    required this.token,
+    required this.refreshToken,
   });
 
   @override
@@ -31,9 +35,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-
-
-
 
   @override
   void initState() {
@@ -48,14 +49,22 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-
     final List<Widget> pages = [
       HomeContent(
         helper: widget.helper,
+        token: widget.token,
+        refreshToken: widget.refreshToken,
       ),
-      const HistoryPage(),
+      HistoryPage(
+        token: widget.token,
+        refreshToken: widget.refreshToken,
+      ),
       const NotificationPage(),
-      ProfilePage(),
+      ProfilePage(
+        helper: widget.helper,
+        refreshToken: widget.refreshToken,
+        token: widget.token,
+      ),
     ];
 
     return Scaffold(

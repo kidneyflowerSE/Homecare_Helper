@@ -3,15 +3,22 @@ import 'package:intl/intl.dart';
 import 'package:homecare_helper/data/model/customer.dart';
 import 'package:homecare_helper/data/model/helper.dart';
 import 'package:homecare_helper/data/model/request.dart';
-import 'package:homecare_helper/data/repository/repository.dart';
 import 'package:homecare_helper/data/model/request_detail.dart';
+import 'dart:async';
+
+import '../data/model/RequestHelper.dart';
+import '../data/repository/repository.dart';
 
 class HomeContent extends StatefulWidget {
   final Helper helper;
+  final String token;
+  final String refreshToken;
 
   const HomeContent({
     Key? key,
     required this.helper,
+    required this.token,
+    required this.refreshToken,
   }) : super(key: key);
 
   @override
@@ -20,20 +27,28 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent>
     with SingleTickerProviderStateMixin {
-  String _selectedStatus = "notDone";
+  String _selectedStatus = "pending";
   Key pageKey = UniqueKey();
   List<Requests> requests = [];
   List<Requests> helperRequests = [];
   List<Customer> customers = [];
-  List<RequestDetail> requestDetails = [];
+  List<RequestHelper> unassignedRequests = [];
+  List<RequestHelper> assignedRequests = [];
   bool isLoading = true;
+  bool isHelperActive = true;
   late TabController _tabController;
+  List<ScrollController> _scrollControllers = [];
   Map<String, Set<int>> completedDaysMap = {};
   final currencyFormat =
       NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
 
+  // Countdown timer variables
+  Timer? _countdownTimer;
+  int _remainingMinutes = 0;
+  int _remainingSeconds = 0;
+
   final Map<String, Map<String, dynamic>> _statusInfo = {
-    "notDone": {
+    "pending": {
       "label": "Chờ xác nhận",
       "color": Colors.amber,
       "icon": Icons.access_time,
@@ -43,7 +58,7 @@ class _HomeContentState extends State<HomeContent>
       "color": Colors.cyan,
       "icon": Icons.assignment_turned_in,
     },
-    "processing": {
+    "inProgress": {
       "label": "Đang tiến hành",
       "color": Colors.blue,
       "icon": Icons.hourglass_top,
@@ -53,7 +68,7 @@ class _HomeContentState extends State<HomeContent>
       "color": Colors.orange,
       "icon": Icons.payments,
     },
-    "done": {
+    "completed": {
       "label": "Hoàn thành",
       "color": Colors.green,
       "icon": Icons.check_circle,
@@ -64,6 +79,15 @@ class _HomeContentState extends State<HomeContent>
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+
+    // Khởi tạo ScrollController cho mỗi tab
+    _scrollControllers = List.generate(5, (index) => ScrollController());
+
+    // Thêm listener cho mỗi scroll controller
+    for (int i = 0; i < _scrollControllers.length; i++) {
+      _scrollControllers[i].addListener(() => _onScroll(i));
+    }
+
     _tabController.addListener(() {
       setState(() {
         _selectedStatus = _getStatusByTabIndex(_tabController.index);
@@ -75,27 +99,94 @@ class _HomeContentState extends State<HomeContent>
   @override
   void dispose() {
     _tabController.dispose();
+    _countdownTimer?.cancel();
+    for (var controller in _scrollControllers) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  void _startCountdownTimer() {
+    _countdownTimer?.cancel();
+
+    if (unassignedRequests.isNotEmpty) {
+      // Tính thời gian hiện tại
+      DateTime now = DateTime.now();
+
+      // Tính số phút đã trôi qua trong giờ hiện tại (0-59)
+      int currentMinutes = now.minute;
+
+      // Tính thời gian còn lại đến phút thứ 60 (tức là giờ tiếp theo)
+      int remainingMinutesToNextHour = 60 - currentMinutes;
+
+      // Nếu chúng ta đang ở phút 0, thì countdown sẽ là 60 phút
+      if (remainingMinutesToNextHour == 60) {
+        _remainingMinutes = 59;
+        _remainingSeconds = 60 - now.second;
+      } else {
+        _remainingMinutes = remainingMinutesToNextHour - 1;
+        _remainingSeconds = 60 - now.second;
+      }
+
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+
+        if (_remainingSeconds > 0) {
+          setState(() {
+            _remainingSeconds--;
+          });
+        } else if (_remainingMinutes > 0) {
+          setState(() {
+            _remainingMinutes--;
+            _remainingSeconds = 59;
+          });
+        } else {
+          // Countdown kết thúc, refresh danh sách
+          refreshRequestsOnly().then((_) {
+            if (mounted) {
+              _startCountdownTimer(); // Restart countdown
+            }
+          });
+        }
+      });
+    }
+  }
+
+  void _onScroll(int tabIndex) {
+    ScrollController controller = _scrollControllers[tabIndex];
+
+    // Kiểm tra nếu đã kéo đến cuối danh sách
+    if (controller.position.pixels == controller.position.maxScrollExtent) {
+      // Nếu user tiếp tục kéo lên (overscroll), reload data
+      if (controller.position.pixels > controller.position.maxScrollExtent) {
+        refreshRequestsOnly();
+      }
+    }
   }
 
   String _getStatusByTabIndex(int index) {
     switch (index) {
       case 0:
-        return "notDone";
+        return "pending";
       case 1:
         return "assigned";
       case 2:
-        return "processing";
+        return "inProgress";
       case 3:
         return "waitPayment";
       case 4:
-        return "done";
+        return "completed";
       default:
-        return "notDone";
+        return "pending";
     }
   }
 
   Future<void> loadData() async {
+    if (!mounted) return;
+
     setState(() {
       isLoading = true;
     });
@@ -105,22 +196,29 @@ class _HomeContentState extends State<HomeContent>
 
       var fetchedRequests = await repository.loadRequest();
       var fetchedCustomers = await repository.loadCustomer();
-      var fetchedRequestDetails =
-          await repository.getRequestDetailById(widget.helper.id);
-
-      setState(() {
-        requests = fetchedRequests ?? [];
-        customers = fetchedCustomers ?? [];
-        requestDetails = fetchedRequestDetails ?? [];
-        updateHelperRequests();
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
+      var unassignedRequestsData =
+          await repository.loadUnassignedRequest(widget.token);
+      var assignedRequestsData =
+          await repository.loadAssignedRequest(widget.token);
 
       if (mounted) {
+        setState(() {
+          requests = fetchedRequests ?? [];
+          customers = fetchedCustomers ?? [];
+          unassignedRequests = unassignedRequestsData ?? [];
+          assignedRequests = assignedRequestsData ?? [];
+          isLoading = false;
+        });
+
+        // Start countdown timer after loading data
+        _startCountdownTimer();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Lỗi tải dữ liệu: $e'),
@@ -131,12 +229,34 @@ class _HomeContentState extends State<HomeContent>
     }
   }
 
-  void updateHelperRequests() {
-    helperRequests = requests
-        .where((request) => request.scheduleIds.any((scheduleId) =>
-            requestDetails
-                .any((requestDetail) => requestDetail.id == scheduleId)))
-        .toList();
+  Future<void> refreshRequestsOnly() async {
+    try {
+      var repository = DefaultRepository();
+
+      var unassignedRequestsData =
+          await repository.loadUnassignedRequest(widget.token);
+      var assignedRequestsData =
+          await repository.loadAssignedRequest(widget.token);
+
+      if (mounted) {
+        setState(() {
+          unassignedRequests = unassignedRequestsData ?? [];
+          assignedRequests = assignedRequestsData ?? [];
+        });
+
+        // Restart countdown timer after refresh
+        _startCountdownTimer();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải danh sách: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   int _countWeeklyJobs(List<Requests> requests) {
@@ -155,88 +275,106 @@ class _HomeContentState extends State<HomeContent>
     }).length;
   }
 
-  double _calculateWeeklyIncome() {
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
-
-    return requestDetails
-        .where((detail) =>
-            detail.status == 'done' &&
-            detail.workingDate != null &&
-            DateTime.parse(detail.workingDate!).isAfter(startOfWeek) &&
-            DateTime.parse(detail.workingDate!)
-                .isBefore(endOfWeek.add(const Duration(days: 1))))
-        .fold(0.0, (sum, detail) => sum + (detail.helperCost ?? 0));
-  }
-
-  double _calculateTotalEarnings() {
-    return requestDetails
-        .where((detail) => detail.status == 'done')
-        .fold(0.0, (sum, detail) => sum + (detail.helperCost ?? 0));
-  }
-
   int _getJobCountByStatus(String status) {
-    return helperRequests.where((req) => req.status == status).length;
-  }
-
-  Future<void> assignedRequest(Requests request) async {
-    var repository = DefaultRepository();
-    await repository.remoteDataSource.assignedRequest(request.id);
-    setState(() {
-      request.status = 'assigned';
-    });
-  }
-
-  Future<void> processingRequest(Requests request, int index) async {
-    var repository = DefaultRepository();
-    for (var i = 0; i < index; ++i) {
-      await repository.processingRequest(request.scheduleIds[i]);
+    if (status == 'pending') {
+      return unassignedRequests.length;
+    } else {
+      return assignedRequests
+          .where((req) => req.schedules.first.status == status)
+          .length;
     }
-    setState(() {
-      request.status = 'processing';
-    });
   }
 
-  Future<void> finishRequest(Requests request, int index) async {
+  Future<void> assignedRequest(RequestHelper request) async {
     var repository = DefaultRepository();
-
-    for (var id = 0; id < index; ++id) {
-      await repository.doneConfirmRequest(request.scheduleIds[id]);
+    await repository.remoteDataSource
+        .assignedRequest(request.schedules.first.id, widget.token);
+    if (mounted) {
+      setState(() {
+        request.schedules.first.status = 'assigned';
+        // Move request from unassigned to assigned list
+        unassignedRequests.removeWhere((r) => r.id == request.id);
+        assignedRequests.add(request);
+      });
+      // Switch to assigned tab
+      _switchToStatusTab('assigned');
+      await refreshRequestsOnly();
     }
-
-    setState(() {
-      request.status = 'waitPayment';
-    });
   }
 
-  Future<void> finishPayment(Requests request) async {
+  Future<void> processingRequest(RequestHelper request, int index) async {
     var repository = DefaultRepository();
-    await repository.remoteDataSource.finishPayment(request.scheduleIds.first);
-    setState(() {
-      request.status = 'done';
-    });
+    await repository.processingRequest(
+        request.schedules.first.id, widget.token);
+    if (mounted) {
+      setState(() {
+        request.schedules.first.status = 'inProgress';
+      });
+      // Switch to in progress tab
+      _switchToStatusTab('inProgress');
+      await refreshRequestsOnly();
+    }
   }
 
-  Future<void> cancelRequest(Requests request) async {
+  Future<void> finishRequest(RequestHelper request, int index) async {
+    var repository = DefaultRepository();
+    await repository.finishRequest(request.schedules.first.id, widget.token);
+    if (mounted) {
+      setState(() {
+        request.schedules.first.status = 'waitPayment';
+      });
+      // Switch to wait payment tab
+      _switchToStatusTab('waitPayment');
+      await refreshRequestsOnly();
+    }
+  }
+
+  Future<void> finishPayment(RequestHelper request) async {
+    var repository = DefaultRepository();
+    await repository.remoteDataSource
+        .finishPayment(request.schedules.first.id, widget.token);
+    if (mounted) {
+      setState(() {
+        request.schedules.first.status = 'completed';
+      });
+      // Switch to done tab
+      _switchToStatusTab('completed');
+      await refreshRequestsOnly();
+    }
+  }
+
+  Future<void> cancelRequest(RequestHelper request) async {
     var repository = DefaultRepository();
     await repository.remoteDataSource.cancelRequest(request.id);
     print("Thông tin huỷ request $request");
-    setState(() {
-      request.status = 'cancelled';
-    });
+    if (mounted) {
+      setState(() {
+        request.schedules.first.status = 'cancelled';
+        // Remove from current lists
+        unassignedRequests.removeWhere((r) => r.id == request.id);
+        assignedRequests.removeWhere((r) => r.id == request.id);
+      });
+      await refreshRequestsOnly();
+    }
   }
 
-  String formatDate(String dateString) {
-    DateTime date = DateTime.parse(dateString);
+  // Add method to switch tabs based on status
+  void _switchToStatusTab(String status) {
+    final statusKeys = _statusInfo.keys.toList();
+    final tabIndex = statusKeys.indexOf(status);
+    if (tabIndex != -1 && _tabController.index != tabIndex) {
+      _tabController.animateTo(tabIndex);
+    }
+  }
+
+  String formatDate(DateTime date) {
     String day = date.day.toString().padLeft(2, '0');
     String month = date.month.toString().padLeft(2, '0');
     String year = date.year.toString();
     return '$day/$month/$year';
   }
 
-  String formatTime(String dateString) {
-    DateTime date = DateTime.parse(dateString);
+  String formatTime(DateTime date) {
     String minutes = date.minute.toString().padLeft(2, '0');
     String hours = date.hour.toString().padLeft(2, '0');
     return '$hours:$minutes';
@@ -244,9 +382,10 @@ class _HomeContentState extends State<HomeContent>
 
   @override
   Widget build(BuildContext context) {
-    updateHelperRequests();
+    // Remove this line since we're not using helperRequests anymore
+    // updateHelperRequests();
 
-    // Filter requests based on selected status
+    // Filter requests based on selected status - this is now unused
     List<Requests> filteredRequests =
         helperRequests.where((req) => req.status == _selectedStatus).toList()
           ..sort((a, b) {
@@ -261,7 +400,7 @@ class _HomeContentState extends State<HomeContent>
       child: isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: loadData,
+              onRefresh: refreshRequestsOnly,
               child: NestedScrollView(
                 headerSliverBuilder: (context, innerBoxIsScrolled) {
                   return [
@@ -271,63 +410,158 @@ class _HomeContentState extends State<HomeContent>
                     SliverToBoxAdapter(
                       child: _buildDashboard(),
                     ),
-                    SliverPersistentHeader(
-                      delegate: _SliverAppBarDelegate(
-                        TabBar(
-                          controller: _tabController,
-                          isScrollable: true,
-                          labelColor: Colors.green,
-                          unselectedLabelColor: Colors.grey.shade400,
-                          indicatorColor: Colors.green,
-                          tabs: _statusInfo.entries.map((entry) {
-                            return Tab(
-                              icon: Badge(
-                                backgroundColor: Colors.red,
-                                label: Text(
-                                    _getJobCountByStatus(entry.key).toString()),
-                                isLabelVisible:
-                                    _getJobCountByStatus(entry.key) > 0,
-                                child: Icon(entry.value["icon"]),
-                              ),
-                              text: entry.value["label"],
-                            );
-                          }).toList(),
+                    // Chỉ hiển thị TabBar khi helper đang active
+                    if (isHelperActive)
+                      SliverPersistentHeader(
+                        delegate: _SliverAppBarDelegate(
+                          TabBar(
+                            controller: _tabController,
+                            isScrollable: true,
+                            labelColor: Colors.green,
+                            unselectedLabelColor: Colors.grey.shade400,
+                            indicatorColor: Colors.green,
+                            tabs: _statusInfo.entries.map((entry) {
+                              return Tab(
+                                icon: Badge(
+                                  backgroundColor: Colors.red,
+                                  label: Text(_getJobCountByStatus(entry.key)
+                                      .toString()),
+                                  isLabelVisible:
+                                      _getJobCountByStatus(entry.key) > 0,
+                                  child: Icon(entry.value["icon"]),
+                                ),
+                                text: entry.value["label"],
+                              );
+                            }).toList(),
+                          ),
                         ),
+                        pinned: true,
                       ),
-                      pinned: true,
-                    ),
                   ];
                 },
-                body: TabBarView(
-                  controller: _tabController,
-                  children: _statusInfo.keys.map((status) {
-                    final statusRequests = helperRequests
-                        .where((req) => req.status == status)
-                        .toList()
-                      ..sort((a, b) {
-                        DateTime dateA = DateTime.parse(
-                            a.startTime ?? DateTime.now().toString());
-                        DateTime dateB = DateTime.parse(
-                            b.startTime ?? DateTime.now().toString());
-                        return dateB.compareTo(dateA);
-                      });
+                body: isHelperActive
+                    ? TabBarView(
+                        controller: _tabController,
+                        children: _statusInfo.keys.map((status) {
+                          final tabIndex =
+                              _statusInfo.keys.toList().indexOf(status);
+                          final statusRequests = status == 'pending'
+                              ? unassignedRequests
+                              : assignedRequests
+                                  .where((req) =>
+                                      req.schedules.first.status == status)
+                                  .toList()
+                            ..sort((a, b) {
+                              DateTime dateA = a.startTime;
+                              DateTime dateB = b.startTime;
+                              return dateB.compareTo(dateA);
+                            });
 
-                    if (statusRequests.isEmpty) {
-                      return _buildEmptyState(status);
-                    }
+                          if (statusRequests.isEmpty) {
+                            return RefreshIndicator(
+                              onRefresh: () async {
+                                await refreshRequestsOnly();
+                                // Auto refresh every 30 seconds for pending tab
+                                if (status == 'pending') {
+                                  _startCountdownTimer();
+                                }
+                              },
+                              child: SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                child: SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.6,
+                                  child: _buildEmptyState(status),
+                                ),
+                              ),
+                            );
+                          }
 
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      itemCount: statusRequests.length,
-                      itemBuilder: (context, index) {
-                        return _buildJobCard(statusRequests[index]);
-                      },
-                    );
-                  }).toList(),
-                ),
+                          return RefreshIndicator(
+                            onRefresh: () async {
+                              await refreshRequestsOnly();
+                              // Auto refresh every 30 seconds for pending tab
+                              if (status == 'pending') {
+                                _startCountdownTimer();
+                              }
+                            },
+                            child: NotificationListener<ScrollNotification>(
+                              onNotification: (ScrollNotification scrollInfo) {
+                                // Kiểm tra nếu đã scroll đến cuối và user vẫn tiếp tục kéo
+                                if (scrollInfo is OverscrollNotification &&
+                                    scrollInfo.overscroll > 0 &&
+                                    scrollInfo.metrics.pixels >=
+                                        scrollInfo.metrics.maxScrollExtent) {
+                                  // Kéo lên ở cuối danh sách - reload
+                                  refreshRequestsOnly();
+                                  return true;
+                                }
+                                return false;
+                              },
+                              child: ListView.builder(
+                                controller: tabIndex < _scrollControllers.length
+                                    ? _scrollControllers[tabIndex]
+                                    : null,
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                itemCount: statusRequests.length,
+                                itemBuilder: (context, index) {
+                                  return _buildJobCard(statusRequests[index]);
+                                },
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: refreshRequestsOnly,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            child: _buildInactiveState(),
+                          ),
+                        ),
+                      ),
               ),
             ),
+    );
+  }
+
+  // Thêm widget cho trạng thái inactive
+  Widget _buildInactiveState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.work_off_outlined,
+            size: 64,
+            color: Colors.grey[300],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Bạn đang tạm dừng nhận việc",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Quicksand',
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Bật trạng thái 'Sẵn sàng nhận việc' để xem danh sách công việc",
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+              fontFamily: 'Quicksand',
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -362,6 +596,7 @@ class _HomeContentState extends State<HomeContent>
               ),
               const SizedBox(width: 12),
               Expanded(
+                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -382,41 +617,99 @@ class _HomeContentState extends State<HomeContent>
                         color: Colors.green,
                         fontFamily: 'Quicksand',
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ],
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
+              const SizedBox(width: 8),
+              Flexible(
+                flex: 2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isHelperActive
+                        ? Colors.green.withOpacity(0.15)
+                        : Colors.grey.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: isHelperActive ? Colors.green : Colors.grey,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      "Trực tuyến",
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        fontFamily: 'Quicksand',
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          isHelperActive ? "Trực tuyến" : "Ngoại tuyến",
+                          style: TextStyle(
+                            color: isHelperActive ? Colors.green : Colors.grey,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            fontFamily: 'Quicksand',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          // Thêm toggle switch
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isHelperActive ? Icons.work : Icons.work_off,
+                  color: isHelperActive ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isHelperActive
+                        ? "Đang sẵn sàng nhận việc"
+                        : "Tạm dừng nhận việc",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isHelperActive ? Colors.green : Colors.grey,
+                      fontFamily: 'Quicksand',
+                    ),
+                  ),
+                ),
+                Switch(
+                  value: isHelperActive,
+                  onChanged: (value) {
+                    setState(() {
+                      isHelperActive = value;
+                    });
+                  },
+                  activeColor: Colors.green,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -424,144 +717,181 @@ class _HomeContentState extends State<HomeContent>
   }
 
   Widget _buildDashboard() {
-    final weeklyIncome = _calculateWeeklyIncome();
-    final totalEarnings = _calculateTotalEarnings();
-    final weeklyJobs = _countWeeklyJobs(helperRequests);
+    // Comment tạm thời phần thống kê
+    // final weeklyIncome = _calculateWeeklyIncome();
+    // final totalEarnings = _calculateTotalEarnings();
+    // final weeklyJobs = _countWeeklyJobs(helperRequests);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Thống kê của bạn",
+          // Comment tạm thời phần thống kê
+          // const Text(
+          //   "Thống kê của bạn",
+          //   style: TextStyle(
+          //     fontSize: 16,
+          //     fontWeight: FontWeight.bold,
+          //     fontFamily: 'Quicksand',
+          //   ),
+          // ),
+          // const SizedBox(height: 16),
+          // Container(
+          //   padding: const EdgeInsets.all(16),
+          //   decoration: BoxDecoration(
+          //     gradient: LinearGradient(
+          //       colors: [
+          //         Colors.green,
+          //         Colors.green.withOpacity(0.7),
+          //       ],
+          //       begin: Alignment.topLeft,
+          //       end: Alignment.bottomRight,
+          //     ),
+          //     borderRadius: BorderRadius.circular(16),
+          //     boxShadow: [
+          //       BoxShadow(
+          //         color: Theme.of(context).primaryColor.withOpacity(0.2),
+          //         blurRadius: 10,
+          //         offset: const Offset(0, 5),
+          //       ),
+          //     ],
+          //   ),
+          //   child: Column(
+          //     crossAxisAlignment: CrossAxisAlignment.start,
+          //     children: [
+          //       const Text(
+          //         "Tổng thu nhập",
+          //         style: TextStyle(
+          //           color: Colors.white70,
+          //           fontSize: 14,
+          //           fontWeight: FontWeight.w600,
+          //           fontFamily: 'Quicksand',
+          //         ),
+          //       ),
+          //       const SizedBox(height: 4),
+          //       Text(
+          //         currencyFormat.format(totalEarnings),
+          //         style: const TextStyle(
+          //           color: Colors.white,
+          //           fontSize: 24,
+          //           fontWeight: FontWeight.bold,
+          //           fontFamily: 'Quicksand',
+          //         ),
+          //       ),
+          //       const SizedBox(height: 16),
+          //       Row(
+          //         children: [
+          //           Expanded(
+          //             child: Column(
+          //               crossAxisAlignment: CrossAxisAlignment.start,
+          //               children: [
+          //                 const Text(
+          //                   "Thu nhập tuần này",
+          //                   style: TextStyle(
+          //                     color: Colors.white70,
+          //                     fontWeight: FontWeight.w600,
+          //                     fontSize: 14,
+          //                     fontFamily: 'Quicksand',
+          //                   ),
+          //                 ),
+          //                 const SizedBox(height: 4),
+          //                 Text(
+          //                   currencyFormat.format(weeklyIncome),
+          //                   style: const TextStyle(
+          //                     color: Colors.white,
+          //                     fontSize: 18,
+          //                     fontWeight: FontWeight.bold,
+          //                     fontFamily: 'Quicksand',
+          //                   ),
+          //                 ),
+          //               ],
+          //             ),
+          //           ),
+          //           Container(
+          //             width: 1,
+          //             height: 30,
+          //             color: Colors.white30,
+          //           ),
+          //           Expanded(
+          //             child: Padding(
+          //               padding: const EdgeInsets.only(left: 16),
+          //               child: Column(
+          //                 crossAxisAlignment: CrossAxisAlignment.start,
+          //                 children: [
+          //                   const Text(
+          //                     "Công việc tuần này",
+          //                     style: TextStyle(
+          //                       color: Colors.white70,
+          //                       fontSize: 14,
+          //                       fontFamily: 'Quicksand',
+          //                     ),
+          //                   ),
+          //                   const SizedBox(height: 4),
+          //                   Text(
+          //                     "$weeklyJobs công việc",
+          //                     style: const TextStyle(
+          //                       color: Colors.white,
+          //                       fontSize: 16,
+          //                       fontWeight: FontWeight.bold,
+          //                       fontFamily: 'Quicksand',
+          //                     ),
+          //                   ),
+          //                 ],
+          //               ),
+          //             ),
+          //           ),
+          //         ],
+          //       ),
+          //     ],
+          //   ),
+          // ),
+          // const SizedBox(height: 24),
+          Text(
+            isHelperActive
+                ? "Danh sách công việc"
+                : "Bạn đang tạm dừng nhận việc",
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               fontFamily: 'Quicksand',
+              color: isHelperActive ? Colors.black : Colors.grey,
             ),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  // Theme.of(context).primaryColor,
-                  // Theme.of(context).primaryColor.withOpacity(0.7),
-                  Colors.green,
-                  Colors.green.withOpacity(0.7),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          // Hiển thị countdown cho tab chờ xác nhận
+          if (isHelperActive &&
+              unassignedRequests.isNotEmpty &&
+              _selectedStatus == "pending")
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
               ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).primaryColor.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Tổng thu nhập",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Quicksand',
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.timer,
+                    color: Colors.orange[700],
+                    size: 20,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  currencyFormat.format(totalEarnings),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Quicksand',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Thu nhập tuần này",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              fontFamily: 'Quicksand',
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            currencyFormat.format(weeklyIncome),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Quicksand',
-                            ),
-                          ),
-                        ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "Danh sách sẽ được cập nhật trong: ${_remainingMinutes.toString().padLeft(2, '0')}:${_remainingSeconds.toString().padLeft(2, '0')}",
+                      style: TextStyle(
+                        color: Colors.orange[700],
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Quicksand',
                       ),
                     ),
-                    Container(
-                      width: 1,
-                      height: 30,
-                      color: Colors.white30,
-                    ),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Công việc tuần này",
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontFamily: 'Quicksand',
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "$weeklyJobs công việc",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Quicksand',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            "Danh sách công việc",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Quicksand',
-            ),
-          ),
           const SizedBox(height: 8),
         ],
       ),
@@ -603,15 +933,13 @@ class _HomeContentState extends State<HomeContent>
     );
   }
 
-  Widget _buildJobCard(Requests request) {
+  Widget _buildJobCard(RequestHelper request) {
     DateTime now =
         DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     DateTime start = DateTime(
-        DateTime.parse(request.startTime).year,
-        DateTime.parse(request.startTime).month,
-        DateTime.parse(request.startTime).day);
+        request.startTime.year, request.startTime.month, request.startTime.day);
 
-    final statusInfo = _statusInfo[request.status] ??
+    final statusInfo = _statusInfo[request.schedules.first.status] ??
         {
           "color": Colors.grey,
           "label": "Không xác định",
@@ -619,17 +947,18 @@ class _HomeContentState extends State<HomeContent>
         };
 
     int index = request.scheduleIds.length; // Default
-    if ((request.status == "processing" || request.status == 'assigned') &&
+    if ((request.schedules.first.status == "inProcess" ||
+            request.schedules.first.status == 'assigned') &&
         start.isAtSameMomentAs(now)) {
       index = now.difference(start).inDays + 1;
     }
 
     String formattedDate = '';
     try {
-      final date = DateTime.parse(request.startTime ?? '');
+      final date = request.startTime;
       formattedDate = DateFormat('dd/MM/yyyy').format(date);
     } catch (e) {
-      formattedDate = request.startTime ?? '';
+      // formattedDate = request.startTime;
     }
 
     return Card(
@@ -661,15 +990,17 @@ class _HomeContentState extends State<HomeContent>
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  statusInfo["label"],
-                  style: TextStyle(
-                    color: statusInfo["color"],
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Quicksand',
+                Expanded(
+                  child: Text(
+                    statusInfo["label"],
+                    style: TextStyle(
+                      color: statusInfo["color"],
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Quicksand',
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
                 Text(
                   formattedDate,
                   style: TextStyle(
@@ -703,40 +1034,56 @@ class _HomeContentState extends State<HomeContent>
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                request.service.title,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Quicksand',
+                              Expanded(
+                                flex: 3,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      request.service.title,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Quicksand',
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 2,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "Mã đơn: #${request.id.substring(0, 8)}",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                        fontFamily: 'Quicksand',
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Mã đơn: #${request.id.substring(0, 8)}",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                  fontFamily: 'Quicksand',
+                              const SizedBox(width: 8),
+                              Flexible(
+                                flex: 2,
+                                child: Text(
+                                  currencyFormat.format(request.totalCost),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                    fontFamily: 'Quicksand',
+                                  ),
+                                  textAlign: TextAlign.right,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            currencyFormat.format(request.totalCost),
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.red,
-                              fontFamily: 'Quicksand',
-                            ),
                           ),
                         ],
                       ),
@@ -757,33 +1104,23 @@ class _HomeContentState extends State<HomeContent>
                 _buildInfoRow(
                   icon: Icons.location_on,
                   label: "Địa chỉ",
-                  value:
-                      "${request.customerInfo.address},${request.location.ward}, ${request.location.district}, ${request.location.province}",
+                  value: request.customerInfo.address,
                 ),
                 if (request.scheduleIds.length > 1)
                   _buildInfoRow(
                       icon: Icons.access_time,
                       label: "Ngày thực hiện",
-                      value:
-                          // "${request.startTime?.split(' ')[1] ?? ''} - ${request.endTime?.split(' ')[1] ?? ''}",
-                          // '5',
-                          '${formatDate(request.startTime)} - ${formatDate(request.endTime)}'),
+                      value: '${formatDate(request.startTime)} - ${formatDate(request.endTime)}'),
                 if (request.scheduleIds.length == 1)
                   _buildInfoRow(
                       icon: Icons.access_time,
                       label: "Ngày thực hiện",
-                      value:
-                          // "${request.startTime?.split(' ')[1] ?? ''} - ${request.endTime?.split(' ')[1] ?? ''}",
-                          // '5',
-                          '${formatDate(request.startTime)}'),
+                      value: '${formatDate(request.startTime)}'),
                 _buildInfoRow(
                     icon: Icons.access_time,
                     label: "Thời gian",
-                    value:
-                        // "${request.startTime?.split(' ')[1] ?? ''} - ${request.endTime?.split(' ')[1] ?? ''}",
-                        // '5',
-                        '${formatTime(request.startTime)} - ${formatTime(request.endTime)}'),
-                if (request.scheduleIds.length > 1)
+                    value: '${formatTime(request.schedules.first.startTime)} - ${formatTime(request.schedules.first.endTime)}'),
+                if (request.schedules.length > 1)
                   _buildInfoRow(
                     icon: Icons.calendar_today,
                     label: "Số ngày",
@@ -841,29 +1178,62 @@ class _HomeContentState extends State<HomeContent>
     );
   }
 
-  Widget _buildActionButtons(Requests request, int index) {
-    switch (request.status) {
-      case "notDone":
-        return Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _showRejectConfirmationDialog(request),
-                icon: const Icon(Icons.close, size: 16, color: Colors.red),
-                label: const Text(
-                  "Từ chối",
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
+  Widget _buildActionButtons(RequestHelper request, int index) {
+    switch (request.schedules.first.status) {
+      case "pending":
+        if (assignedRequests.contains((req) =>
+            req.schedules.first.status == 'inProgress' ||
+            req.schedules.first.status == 'assigned' ||
+            req.schedules.first.status == 'waitPayment')) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Colors.orange,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Bạn đã có công việc được giao, hoàn thành trước khi nhận việc mới",
+                    style: TextStyle(
+                      color: Colors.orange[700],
+                      fontSize: 12,
+                      fontFamily: 'Quicksand',
+                    ),
                   ),
                 ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
+              ],
             ),
-            const SizedBox(width: 12),
+          );
+        }
+
+        return Row(
+          children: [
+            // Expanded(
+            //   child: OutlinedButton.icon(
+            //     onPressed: () => _showRejectConfirmationDialog(request),
+            //     icon: const Icon(Icons.close, size: 16, color: Colors.red),
+            //     label: const Text(
+            //       "Từ chối",
+            //       style: TextStyle(
+            //         fontFamily: 'Quicksand',
+            //       ),
+            //     ),
+            //     style: OutlinedButton.styleFrom(
+            //       foregroundColor: Colors.red,
+            //       side: const BorderSide(color: Colors.red),
+            //       padding: const EdgeInsets.symmetric(vertical: 12),
+            //     ),
+            //   ),
+            // ),
+            // const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => _showAcceptConfirmationDialog(request),
@@ -904,7 +1274,7 @@ class _HomeContentState extends State<HomeContent>
             minimumSize: const Size(double.infinity, 48),
           ),
         );
-      case "processing":
+      case "inProgress":
         return ElevatedButton.icon(
           onPressed: () => finishRequest(request, index),
           icon: const Icon(
@@ -947,7 +1317,7 @@ class _HomeContentState extends State<HomeContent>
     }
   }
 
-  Future<void> _showRejectConfirmationDialog(Requests request) async {
+  Future<void> _showRejectConfirmationDialog(RequestHelper request) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -1013,16 +1383,36 @@ class _HomeContentState extends State<HomeContent>
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              onPressed: () {
-                cancelRequest(request);
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã từ chối công việc thành công'),
-                    backgroundColor: Colors.red,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+              onPressed: () async {
+                // Get the navigator and scaffold messenger before async operation
+                final navigator = Navigator.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                navigator.pop();
+
+                try {
+                  await cancelRequest(request);
+
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Đã từ chối công việc thành công'),
+                        backgroundColor: Colors.red,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Lỗi khi từ chối việc: $e'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                }
               },
             ),
           ],
@@ -1031,7 +1421,7 @@ class _HomeContentState extends State<HomeContent>
     );
   }
 
-  Future<void> _showAcceptConfirmationDialog(Requests request) async {
+  Future<void> _showAcceptConfirmationDialog(RequestHelper request) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -1074,13 +1464,13 @@ class _HomeContentState extends State<HomeContent>
                   ),
                 ),
                 Text(
-                  'Thời gian: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(request.startTime ?? ''))}',
+                  'Thời gian: ${DateFormat('dd/MM/yyyy').format(request.startTime)}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
-                  'Địa chỉ: ${request.customerInfo.address}, ${request.location.ward}, ${request.location.district}, ${request.location.province}',
+                  'Địa chỉ: ${request.customerInfo.address}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w500,
                     fontFamily: 'Quicksand',
@@ -1117,19 +1507,43 @@ class _HomeContentState extends State<HomeContent>
                   fontFamily: 'Quicksand',
                 ),
               ),
-              onPressed: () {
-                assignedRequest(request);
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã nhận công việc thành công',
-                        style: TextStyle(
-                          fontFamily: 'Quicksand',
-                        )),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+              onPressed: () async {
+                // Get the navigator and scaffold messenger before async operation
+                final navigator = Navigator.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                navigator.pop();
+
+                try {
+                  await assignedRequest(request);
+
+                  // Check if widget is still mounted before showing snackbar
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Đã nhận công việc thành công',
+                            style: TextStyle(
+                              fontFamily: 'Quicksand',
+                            )),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    scaffoldMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Lỗi khi nhận việc: $e',
+                            style: const TextStyle(
+                              fontFamily: 'Quicksand',
+                            )),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                }
               },
             ),
           ],

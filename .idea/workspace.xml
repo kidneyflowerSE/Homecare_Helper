@@ -10,12 +10,28 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a6fd4a31-6ad7-40e0-a445-30aa156b35e0" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/lib/data/model/Addresses.dart" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/data/model/Authen.dart" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/data/model/RequestHelper.dart" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/pages/certificates_page.dart" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/pages/personal_info_page.dart" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lib/pages/schedule_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/other.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/other.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/android/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/android/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/homecare_helper.iml" beforeDir="false" afterPath="$PROJECT_DIR$/homecare_helper.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/data/model/helper.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/model/helper.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/data/repository/helper_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/repository/helper_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/data/repository/repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/repository/repository.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lib/data/source/source.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/source/source.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/main.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/pages/history_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/history_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/pages/home_content.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/home_content.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/pages/home_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/home_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/pages/login_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/login_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/pages/order_detail_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/order_detail_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lib/pages/profile_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/lib/pages/profile_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pubspec.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,6 +53,14 @@
         </entry>
       </file>
     </leaf>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+        <option value="Dart File" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />

@@ -1,31 +1,110 @@
 import 'package:flutter/material.dart';
+import 'package:homecare_helper/data/model/helper.dart';
+import 'package:intl/intl.dart';
+
+import '../data/model/RequestHelper.dart';
+import '../data/repository/repository.dart';
+import 'package:homecare_helper/pages/personal_info_page.dart';
+import 'package:homecare_helper/pages/certificates_page.dart';
+import 'package:homecare_helper/pages/schedule_page.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({Key? key}) : super(key: key);
+  final String token;
+  final String refreshToken;
+  final Helper helper;
+
+  const ProfilePage({Key? key, required this.token, required this.refreshToken, required this.helper})
+      : super(key: key);
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final Map<String, dynamic> _userProfile = {
-    'name': 'Phạm Nguyễn Quốc Huy',
-    'email': 'pnghuyuidev@gmail.com',
-    'phone': '0901234567',
-    'address': 'Quận 1, TP.HCM',
-    'avgRating': 4.8,
-    'totalJobs': 56,
-    'totalEarnings': '12.500.000đ',
-    'memberSince': '05/2024',
-    'skills': ['Dọn dẹp nhà', 'Giặt ủi', 'Sửa điện nước', 'Vệ sinh máy lạnh'],
-    'verification': {
-      'identity': true,
-      'address': true,
-      'phone': true,
-      'skills': true,
-    },
-    'availableStatus': true,
-  };
+  List<RequestHelper> assignedRequests = [];
+  num totalCompletedJobs = 0;
+  num totalEarnings = 0;
+  double avgRating = 0.0;
+  bool _isLoading = true;
+  bool availableStatus = true;
+
+  @override
+  void initState() {
+    super.initState();
+    availableStatus = widget.helper.workingStatus == "working";
+    loadData();
+  }
+
+  Future<void> loadData() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      var repository = DefaultRepository();
+      var assignedRequestsData =
+          await repository.loadAssignedRequest(widget.token);
+
+      if (mounted) {
+        setState(() {
+          assignedRequests = assignedRequestsData ?? [];
+          _calculateStatistics();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải dữ liệu: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _calculateStatistics() {
+    final completedRequests = assignedRequests.where((request) {
+      return request.schedules.isNotEmpty &&
+          request.schedules.first.status == "completed";
+    }).toList();
+
+    totalCompletedJobs = completedRequests.length;
+
+    // Calculate total earnings from completed jobs
+    totalEarnings = completedRequests.fold(0, (sum, request) {
+      return sum + (request.schedules.isNotEmpty ? request.schedules.first.helperCost : 0);
+    });
+
+    // Calculate average rating (mock calculation based on ID)
+    if (completedRequests.isNotEmpty) {
+      int totalRating = completedRequests.fold(0, (sum, request) {
+        return sum + ((request.id.hashCode % 5) + 1);
+      });
+      avgRating = totalRating / completedRequests.length;
+    }
+  }
+
+  String _formatMemberSince() {
+    try {
+      final startDate = DateTime.parse(widget.helper.startDate ?? '');
+      return DateFormat('MM/yyyy').format(startDate);
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
+  String _formatCurrency(num amount) {
+    final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+    return formatter.format(amount);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +187,13 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               CircleAvatar(
                 radius: 40,
-                backgroundImage: AssetImage('lib/images/staff/anhhuy.jpg'),
+                backgroundImage: widget.helper.avatar != null
+                    ? NetworkImage(widget.helper.avatar!)
+                    : AssetImage('lib/images/staff/anhhuy.jpg') as ImageProvider,
+                onBackgroundImageError: (_, __) {},
+                child: widget.helper.avatar == null
+                    ? Icon(Icons.person, size: 40, color: Colors.grey)
+                    : null,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -116,7 +201,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _userProfile['name'],
+                      widget.helper.fullName ?? 'Không có tên',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -133,7 +218,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          "${_userProfile['avgRating']} | ${_userProfile['totalJobs']} công việc",
+                          "${avgRating.toStringAsFixed(1)} | $totalCompletedJobs công việc",
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[700],
@@ -144,7 +229,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Thành viên từ ${_userProfile['memberSince']}",
+                      "Thành viên từ ${_formatMemberSince()}",
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[600],
@@ -183,23 +268,19 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const Spacer(),
                 Text(
-                  _userProfile['availableStatus']
-                      ? "Đang hoạt động"
-                      : "Đang nghỉ",
+                  availableStatus ? "Đang hoạt động" : "Đang nghỉ",
                   style: TextStyle(
-                    color: _userProfile['availableStatus']
-                        ? Colors.green
-                        : Colors.red,
+                    color: availableStatus ? Colors.green : Colors.red,
                     fontWeight: FontWeight.w500,
                     fontFamily: 'Quicksand',
                   ),
                 ),
                 const SizedBox(width: 8),
                 Switch(
-                  value: _userProfile['availableStatus'],
+                  value: availableStatus,
                   onChanged: (value) {
                     setState(() {
-                      _userProfile['availableStatus'] = value;
+                      availableStatus = value;
                     });
                   },
                   activeColor: Colors.green,
@@ -214,14 +295,10 @@ class _ProfilePageState extends State<ProfilePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildVerificationBadge("Xác thực", Icons.verified_user,
-                  _userProfile['verification']['identity']),
-              _buildVerificationBadge("Địa chỉ", Icons.location_on,
-                  _userProfile['verification']['address']),
-              _buildVerificationBadge("Điện thoại", Icons.phone,
-                  _userProfile['verification']['phone']),
-              _buildVerificationBadge("Kỹ năng", Icons.handyman,
-                  _userProfile['verification']['skills']),
+              _buildVerificationBadge("Xác thực", Icons.verified_user, widget.helper.status == "active"),
+              _buildVerificationBadge("Địa chỉ", Icons.location_on, widget.helper.address != null),
+              _buildVerificationBadge("Điện thoại", Icons.phone, widget.helper.phone != null),
+              _buildVerificationBadge("Kỹ năng", Icons.handyman, widget.helper.jobs.isNotEmpty),
             ],
           ),
         ],
@@ -291,7 +368,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Expanded(
                 child: _buildStatItem(
                   "Tổng công việc",
-                  _userProfile['totalJobs'].toString(),
+                  totalCompletedJobs.toString(),
                   Icons.work,
                   Colors.blue,
                 ),
@@ -300,7 +377,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Expanded(
                 child: _buildStatItem(
                   "Tổng thu nhập",
-                  _userProfile['totalEarnings'],
+                  _formatCurrency(totalEarnings),
                   Icons.attach_money,
                   Colors.green,
                 ),
@@ -308,8 +385,30 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
           const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatItem(
+                  "Kinh nghiệm",
+                  "${widget.helper.yearOfExperience} năm",
+                  Icons.timeline,
+                  Colors.orange,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildStatItem(
+                  "Đánh giá",
+                  avgRating.toStringAsFixed(1),
+                  Icons.star,
+                  Colors.amber,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           Text(
-            "Kỹ năng",
+            "Thông tin cá nhân",
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -317,37 +416,49 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                (_userProfile['skills'] as List<String>).map<Widget>((skill) {
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  skill,
-                  style: TextStyle(
-                    color: Colors.blue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'Quicksand',
-                  ),
-                ),
-              );
-            }).toList(),
+          _buildInfoRow("Giới tính", widget.helper.gender ?? "Không có thông tin"),
+          _buildInfoRow("Số điện thoại", widget.helper.phone ?? "Không có thông tin"),
+          _buildInfoRow("Địa chỉ", widget.helper.address ?? "Không có thông tin"),
+          _buildInfoRow("Khu vực làm việc", "${widget.helper.workingArea.province} - ${widget.helper.workingArea.districts.join(', ')}"),
+          _buildInfoRow("Mô tả công việc", widget.helper.jobDetail ?? "Không có thông tin"),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              "$title:",
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontFamily: 'Quicksand',
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[800],
+                fontFamily: 'Quicksand',
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(
-      String title, String value, IconData icon, Color color) {
+  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -365,12 +476,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 size: 16,
               ),
               const SizedBox(width: 4),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[700],
-                  fontFamily: 'Quicksand',
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                    fontFamily: 'Quicksand',
+                  ),
                 ),
               ),
             ],
@@ -426,15 +539,36 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<Widget> _buildAccountMenuItems() {
     return [
-      _buildMenuItem("Thông tin cá nhân", Icons.person, () {}),
-      _buildMenuItem("Chứng chỉ & Kỹ năng", Icons.verified, () {}),
+      _buildMenuItem("Thông tin cá nhân", Icons.person, () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PersonalInfoPage(helper: widget.helper),
+          ),
+        );
+      }),
+      _buildMenuItem("Chứng chỉ & Kỹ năng", Icons.verified, () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CertificatesPage(helper: widget.helper),
+          ),
+        );
+      }),
       _buildMenuItem("Tài khoản ngân hàng", Icons.account_balance, () {}),
     ];
   }
 
   List<Widget> _buildWorkMenuItems() {
     return [
-      _buildMenuItem("Lịch làm việc", Icons.calendar_today, () {}),
+      _buildMenuItem("Lịch làm việc", Icons.calendar_today, () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SchedulePage(helper: widget.helper,),
+          ),
+        );
+      }),
       _buildMenuItem("Thống kê thu nhập", Icons.bar_chart, () {}),
       _buildMenuItem("Đánh giá từ khách hàng", Icons.star, () {}),
     ];

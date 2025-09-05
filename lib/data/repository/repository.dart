@@ -1,3 +1,4 @@
+import 'package:homecare_helper/data/model/RequestHelper.dart';
 import 'package:homecare_helper/data/model/coefficient.dart';
 import 'package:homecare_helper/data/model/cost_factor.dart';
 import 'package:homecare_helper/data/model/customer.dart';
@@ -9,6 +10,8 @@ import 'package:homecare_helper/data/model/request_detail.dart';
 import 'package:homecare_helper/data/model/services.dart';
 import 'package:homecare_helper/data/model/time_off.dart';
 import 'package:homecare_helper/data/source/source.dart';
+
+import '../model/Authen.dart';
 
 abstract interface class Repository {
   Future<List<Helper>?> loadCleanerData();
@@ -25,25 +28,21 @@ abstract interface class Repository {
 
   Future<List<RequestDetail>?> loadRequestDetail();
 
-  Future<List<RequestDetail>?> getRequestDetailById(String id);
-
-  Future<List<RequestDetail>?> loadRequestDetailId(List<String> id);
-
   Future<List<TimeOff>?> loadTimeOff();
 
   Future<void> sendRequest(Requests requests);
 
   Future<void> canceledRequest(String id);
 
-  Future<void> assignedRequest(String id);
+  Future<void> assignedRequest(String id, String token);
 
-  Future<void> processingRequest(String id);
+  Future<void> processingRequest(String id, String token);
 
-  Future<void> doneConfirmRequest(String id);
+  Future<void> finishRequest(String id, String token);
 
   Future<void> waitPaymentRequest(String id);
 
-  Future<void> finishPayment(String id);
+  Future<void> finishPayment(String id, String token);
 
   Future<void> sendMessage(String phone);
 
@@ -64,6 +63,14 @@ abstract interface class Repository {
       num serviceFactor);
 
   Future<void> sendCustomerRegisterRequest(Customer customer);
+
+  Future<void> loginHelper(String phone, String password);
+
+  Future<void> registerHelper(String phone, String password, String fullName, String email, Addresses addresses);
+
+  Future<List<RequestHelper>?> loadUnassignedRequest(String token);
+
+  Future<List<RequestHelper>?> loadAssignedRequest(String token);
 }
 
 class DefaultRepository implements Repository {
@@ -105,11 +112,6 @@ class DefaultRepository implements Repository {
   }
 
   @override
-  Future<List<RequestDetail>?> getRequestDetailById(String id) async {
-    return await remoteDataSource.getAllRequestDetailOfHelperId(id);
-  }
-
-  @override
   Future<void> sendRequest(Requests request) async {
     await remoteDataSource.sendRequests(request);
   }
@@ -140,8 +142,8 @@ class DefaultRepository implements Repository {
   }
 
   @override
-  Future<void> doneConfirmRequest(String id) async {
-    return await remoteDataSource.finishRequest(id);
+  Future<void> finishRequest(String id, String token) async {
+    return await remoteDataSource.finishRequest(id, token);
   }
 
   @override
@@ -177,22 +179,43 @@ class DefaultRepository implements Repository {
   }
 
   @override
-  Future<void> assignedRequest(String id) async{
-    return await remoteDataSource.assignedRequest(id);
+  Future<void> assignedRequest(String id, String token) async{
+    return await remoteDataSource.assignedRequest(id, token);
   }
 
   @override
-  Future<void> finishPayment(String id) async {
-    return await remoteDataSource.finishPayment(id);
+  Future<void> finishPayment(String id, String token) async {
+    return await remoteDataSource.finishPayment(id, token);
   }
 
   @override
-  Future<void> processingRequest(String id) async {
-    return await remoteDataSource.processingRequest(id);
+  Future<void> processingRequest(String id, String token) async {
+    return await remoteDataSource.processingRequest(id, token);
   }
 
   @override
   Future<void> waitPaymentRequest(String id) async {
     return await remoteDataSource.waitPayment(id);
+  }
+
+
+  @override
+  Future<Authen?> loginHelper(String phone, String password) async{
+    return await remoteDataSource.loginHelper(phone, password);
+  }
+
+  @override
+  Future<Authen?> registerHelper(String phone, String password, String fullName, String email, Addresses addresses) async{
+    return await remoteDataSource.registerHelper(phone, password, fullName, email, addresses);
+  }
+
+  @override
+  Future<List<RequestHelper>?> loadUnassignedRequest(String token) async{
+    return await remoteDataSource.loadUnassignedRequest(token);
+  }
+
+  @override
+  Future<List<RequestHelper>?> loadAssignedRequest(String token) async{
+    return await remoteDataSource.loadAssignedRequest(token);
   }
 }
