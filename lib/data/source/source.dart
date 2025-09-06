@@ -76,6 +76,8 @@ abstract interface class DataSource {
   Future<List<RequestHelper>?> loadUnassignedRequest(String token);
 
   Future<List<RequestHelper>?> loadAssignedRequest(String token);
+
+  Future<void> updateWorkingStatus(String workingStatus, String token);
 }
 
 class RemoteDataSource implements DataSource {
@@ -784,6 +786,32 @@ class RemoteDataSource implements DataSource {
       });
     } catch (e) {
       print('Error loading assigned requests: $e');
+      return Future.error(e);
+    }
+  }
+
+  @override
+  Future<void> updateWorkingStatus(String workingStatus, String token) {
+    final url = 'https://homecareapi.vercel.app/helper/status';
+    final uri = Uri.parse(url);
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token'
+    };
+    final body = jsonEncode({'workingStatus': workingStatus});
+    try {
+      return http.patch(uri, headers: headers, body: body).then((response) {
+        if (response.statusCode == 200) {
+          if (kDebugMode) {
+            print('Status updated successfully!');
+          }
+        } else {
+          print('Failed to update status. Status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
+        }
+      });
+    } catch (e) {
+      print('Error updating status: $e');
       return Future.error(e);
     }
   }

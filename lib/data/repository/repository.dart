@@ -71,6 +71,8 @@ abstract interface class Repository {
   Future<List<RequestHelper>?> loadUnassignedRequest(String token);
 
   Future<List<RequestHelper>?> loadAssignedRequest(String token);
+
+  Future<void> updateWorkingStatus(String status, String token);
 }
 
 class DefaultRepository implements Repository {
@@ -217,5 +219,10 @@ class DefaultRepository implements Repository {
   @override
   Future<List<RequestHelper>?> loadAssignedRequest(String token) async{
     return await remoteDataSource.loadAssignedRequest(token);
+  }
+
+  @override
+  Future<void> updateWorkingStatus(String status, String token) {
+    return remoteDataSource.updateWorkingStatus(status, token);
   }
 }

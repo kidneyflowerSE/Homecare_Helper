@@ -35,7 +35,6 @@ class _HomeContentState extends State<HomeContent>
   List<RequestHelper> unassignedRequests = [];
   List<RequestHelper> assignedRequests = [];
   bool isLoading = true;
-  bool isHelperActive = true;
   late TabController _tabController;
   List<ScrollController> _scrollControllers = [];
   Map<String, Set<int>> completedDaysMap = {};
@@ -181,6 +180,27 @@ class _HomeContentState extends State<HomeContent>
         return "completed";
       default:
         return "pending";
+    }
+  }
+  
+  void updateWorkingStatus(String status) async {
+    var repository = DefaultRepository();
+    await repository.updateWorkingStatus(status, widget.token);
+    if (mounted) {
+      setState(() {
+        widget.helper.workingStatus = status;
+      });
+      if (widget.helper.workingStatus == "online") {
+        // Nếu chuyển sang online, chỉ tải lại danh sách công việc
+        refreshRequestsOnly();
+      } else {
+        // Nếu chuyển sang offline, dừng timer và xóa danh sách công việc
+        _countdownTimer?.cancel();
+        setState(() {
+          unassignedRequests.clear();
+          assignedRequests.clear();
+        });
+      }
     }
   }
 
@@ -410,8 +430,8 @@ class _HomeContentState extends State<HomeContent>
                     SliverToBoxAdapter(
                       child: _buildDashboard(),
                     ),
-                    // Chỉ hiển thị TabBar khi helper đang active
-                    if (isHelperActive)
+                    // Chỉ hiển thị TabBar khi helper đang online
+                    if (widget.helper.workingStatus == "online")
                       SliverPersistentHeader(
                         delegate: _SliverAppBarDelegate(
                           TabBar(
@@ -439,7 +459,7 @@ class _HomeContentState extends State<HomeContent>
                       ),
                   ];
                 },
-                body: isHelperActive
+                body: widget.helper.workingStatus == "online"
                     ? TabBarView(
                         controller: _tabController,
                         children: _statusInfo.keys.map((status) {
@@ -629,7 +649,7 @@ class _HomeContentState extends State<HomeContent>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isHelperActive
+                    color: widget.helper.workingStatus == "online"
                         ? Colors.green.withOpacity(0.15)
                         : Colors.grey.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -641,16 +661,16 @@ class _HomeContentState extends State<HomeContent>
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: isHelperActive ? Colors.green : Colors.grey,
+                          color: widget.helper.workingStatus == "online" ? Colors.green : Colors.grey,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          isHelperActive ? "Trực tuyến" : "Ngoại tuyến",
+                          widget.helper.workingStatus == "online" ? "Trực tuyến" : "Ngoại tuyến",
                           style: TextStyle(
-                            color: isHelperActive ? Colors.green : Colors.grey,
+                            color: widget.helper.workingStatus == "online" ? Colors.green : Colors.grey,
                             fontWeight: FontWeight.w600,
                             fontSize: 12,
                             fontFamily: 'Quicksand',
@@ -682,28 +702,28 @@ class _HomeContentState extends State<HomeContent>
             child: Row(
               children: [
                 Icon(
-                  isHelperActive ? Icons.work : Icons.work_off,
-                  color: isHelperActive ? Colors.green : Colors.grey,
+                  widget.helper.workingStatus == "online" ? Icons.work : Icons.work_off,
+                  color: widget.helper.workingStatus == "online" ? Colors.green : Colors.grey,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    isHelperActive
+                    widget.helper.workingStatus == "online"
                         ? "Đang sẵn sàng nhận việc"
                         : "Tạm dừng nhận việc",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: isHelperActive ? Colors.green : Colors.grey,
+                      color: widget.helper.workingStatus == "online" ? Colors.green : Colors.grey,
                       fontFamily: 'Quicksand',
                     ),
                   ),
                 ),
                 Switch(
-                  value: isHelperActive,
+                  value: widget.helper.workingStatus == "online",
                   onChanged: (value) {
+                    updateWorkingStatus(value ? 'online' : 'offline');
                     setState(() {
-                      isHelperActive = value;
                     });
                   },
                   activeColor: Colors.green,
@@ -717,149 +737,29 @@ class _HomeContentState extends State<HomeContent>
   }
 
   Widget _buildDashboard() {
-    // Comment tạm thời phần thống kê
-    // final weeklyIncome = _calculateWeeklyIncome();
-    // final totalEarnings = _calculateTotalEarnings();
-    // final weeklyJobs = _countWeeklyJobs(helperRequests);
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Comment tạm thời phần thống kê
-          // const Text(
-          //   "Thống kê của bạn",
-          //   style: TextStyle(
-          //     fontSize: 16,
-          //     fontWeight: FontWeight.bold,
-          //     fontFamily: 'Quicksand',
-          //   ),
-          // ),
-          // const SizedBox(height: 16),
-          // Container(
-          //   padding: const EdgeInsets.all(16),
-          //   decoration: BoxDecoration(
-          //     gradient: LinearGradient(
-          //       colors: [
-          //         Colors.green,
-          //         Colors.green.withOpacity(0.7),
-          //       ],
-          //       begin: Alignment.topLeft,
-          //       end: Alignment.bottomRight,
-          //     ),
-          //     borderRadius: BorderRadius.circular(16),
-          //     boxShadow: [
-          //       BoxShadow(
-          //         color: Theme.of(context).primaryColor.withOpacity(0.2),
-          //         blurRadius: 10,
-          //         offset: const Offset(0, 5),
-          //       ),
-          //     ],
-          //   ),
-          //   child: Column(
-          //     crossAxisAlignment: CrossAxisAlignment.start,
-          //     children: [
-          //       const Text(
-          //         "Tổng thu nhập",
-          //         style: TextStyle(
-          //           color: Colors.white70,
-          //           fontSize: 14,
-          //           fontWeight: FontWeight.w600,
-          //           fontFamily: 'Quicksand',
-          //         ),
-          //       ),
-          //       const SizedBox(height: 4),
-          //       Text(
-          //         currencyFormat.format(totalEarnings),
-          //         style: const TextStyle(
-          //           color: Colors.white,
-          //           fontSize: 24,
-          //           fontWeight: FontWeight.bold,
-          //           fontFamily: 'Quicksand',
-          //         ),
-          //       ),
-          //       const SizedBox(height: 16),
-          //       Row(
-          //         children: [
-          //           Expanded(
-          //             child: Column(
-          //               crossAxisAlignment: CrossAxisAlignment.start,
-          //               children: [
-          //                 const Text(
-          //                   "Thu nhập tuần này",
-          //                   style: TextStyle(
-          //                     color: Colors.white70,
-          //                     fontWeight: FontWeight.w600,
-          //                     fontSize: 14,
-          //                     fontFamily: 'Quicksand',
-          //                   ),
-          //                 ),
-          //                 const SizedBox(height: 4),
-          //                 Text(
-          //                   currencyFormat.format(weeklyIncome),
-          //                   style: const TextStyle(
-          //                     color: Colors.white,
-          //                     fontSize: 18,
-          //                     fontWeight: FontWeight.bold,
-          //                     fontFamily: 'Quicksand',
-          //                   ),
-          //                 ),
-          //               ],
-          //             ),
-          //           ),
-          //           Container(
-          //             width: 1,
-          //             height: 30,
-          //             color: Colors.white30,
-          //           ),
-          //           Expanded(
-          //             child: Padding(
-          //               padding: const EdgeInsets.only(left: 16),
-          //               child: Column(
-          //                 crossAxisAlignment: CrossAxisAlignment.start,
-          //                 children: [
-          //                   const Text(
-          //                     "Công việc tuần này",
-          //                     style: TextStyle(
-          //                       color: Colors.white70,
-          //                       fontSize: 14,
-          //                       fontFamily: 'Quicksand',
-          //                     ),
-          //                   ),
-          //                   const SizedBox(height: 4),
-          //                   Text(
-          //                     "$weeklyJobs công việc",
-          //                     style: const TextStyle(
-          //                       color: Colors.white,
-          //                       fontSize: 16,
-          //                       fontWeight: FontWeight.bold,
-          //                       fontFamily: 'Quicksand',
-          //                     ),
-          //                   ),
-          //                 ],
-          //               ),
-          //             ),
-          //           ),
-          //         ],
-          //       ),
-          //     ],
-          //   ),
-          // ),
-          // const SizedBox(height: 24),
+          // final weeklyIncome = _calculateWeeklyIncome();
+          // final totalEarnings = _calculateTotalEarnings();
+          // final weeklyJobs = _countWeeklyJobs(helperRequests);
+
           Text(
-            isHelperActive
+            widget.helper.workingStatus == "online"
                 ? "Danh sách công việc"
                 : "Bạn đang tạm dừng nhận việc",
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               fontFamily: 'Quicksand',
-              color: isHelperActive ? Colors.black : Colors.grey,
+              color: widget.helper.workingStatus == "online" ? Colors.black : Colors.grey,
             ),
           ),
           // Hiển thị countdown cho tab chờ xác nhận
-          if (isHelperActive &&
+          if (widget.helper.workingStatus == "online" &&
               unassignedRequests.isNotEmpty &&
               _selectedStatus == "pending")
             Container(
