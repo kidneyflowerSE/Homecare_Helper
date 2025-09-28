@@ -31,9 +31,6 @@ void main() async {
     onTokenReceived: (String token) async {
       print("🎯 Đã nhận FCM Token: $token");
 
-      // TODO: Gửi token lên server của bạn khi user đăng nhập
-      // await FCMService.sendTokenToServer(token, userId: 'current_user_id');
-
       // Subscribe to general topics
       await FCMService.subscribeToTopic('general');
       await FCMService.subscribeToTopic('homecare_updates');

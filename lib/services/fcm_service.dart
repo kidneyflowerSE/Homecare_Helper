@@ -184,28 +184,82 @@ class FCMService {
   static void handleForegroundMessage(RemoteMessage message) {
     print("📩 Thông báo foreground: ${message.notification?.title}");
 
-    // Hiển thị thông báo overlay
+    // Hiển thị thông báo overlay với logo app
     if (message.notification != null) {
       showSimpleNotification(
-        Text(message.notification!.title ?? 'Thông báo'),
-        subtitle: Text(message.notification!.body ?? ''),
-        background: Colors.blue,
-        duration: Duration(seconds: 4),
-        leading: Icon(
-          Icons.notifications,
-          color: Colors.white,
+        Text(
+          message.notification!.title ?? 'Thông báo',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.green.shade800,
+          ),
         ),
-        trailing: TextButton(
-          onPressed: () {
-            // Dismiss the notification overlay
-            if (_navigatorKey?.currentContext != null) {
-              OverlaySupportEntry.of(_navigatorKey!.currentContext!)?.dismiss();
-            }
-            _handleDataPayload(message.data);
-          },
-          child: Text(
-            'Xem',
-            style: TextStyle(color: Colors.white),
+        subtitle: Text(
+          message.notification!.body ?? '',
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.green.shade600,
+          ),
+        ),
+        background: Colors.white,
+        duration: Duration(seconds: 5),
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.green.shade50,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.green.shade200,
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.shade100,
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              'lib/images/logo_noti.png',
+              width: 35,
+              height: 35,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.notifications,
+                  color: Colors.green.shade600,
+                  size: 24,
+                );
+              },
+            ),
+          ),
+        ),
+        trailing: Container(
+          decoration: BoxDecoration(
+            color: Colors.green.shade600,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: TextButton(
+            onPressed: () {
+              // Dismiss the notification overlay
+              if (_navigatorKey?.currentContext != null) {
+                OverlaySupportEntry.of(_navigatorKey!.currentContext!)?.dismiss();
+              }
+              _handleDataPayload(message.data);
+            },
+            child: Text(
+              'Xem',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
           ),
         ),
       );
