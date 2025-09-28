@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "18882475992",
+    "project_id": "homecare-a46a5",
+    "storage_bucket": "homecare-a46a5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:18882475992:android:3c88023b040de85e3da4ad",
+        "android_client_info": {
+          "package_name": "com.example.homecare_helper"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8t9lDVhEDuF6S2mJIfqMDyvOEw5KHZ2k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:18882475992:android:374ca9d0839bf8273da4ad",
+        "android_client_info": {
+          "package_name": "com.example.testflutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8t9lDVhEDuF6S2mJIfqMDyvOEw5KHZ2k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

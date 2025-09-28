@@ -10,6 +10,7 @@ import 'package:homecare_helper/data/model/request_detail.dart';
 import 'package:homecare_helper/data/model/services.dart';
 import 'package:homecare_helper/data/repository/repository.dart';
 import 'package:homecare_helper/pages/home_page.dart';
+import 'package:homecare_helper/services/fcm_service.dart';
 
 class LoginPage extends StatefulWidget {
   final void Function()? onTap;
@@ -161,6 +162,12 @@ class _LoginPageState extends State<LoginPage>
       if(authData != null) {
         token = authData.accessToken ?? '';
         refreshToken = authData.refreshToken ?? '';
+        String? deviceToken = FCMService.currentToken;
+        if(deviceToken == null) {
+          deviceToken = await FCMService.refreshToken();
+        }
+        var isSuccess = await repository.registerHelperDeviceToken(deviceToken!, phone);
+        isSuccess! ? print("Device token updated successfully") : print("Failed to update device token");
       } else {
         setState(() => passwordError = "Số điện thoại hoặc mật khẩu không đúng");
         return;

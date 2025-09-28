@@ -73,6 +73,8 @@ abstract interface class Repository {
   Future<List<RequestHelper>?> loadAssignedRequest(String token);
 
   Future<void> updateWorkingStatus(String status, String token);
+
+  Future<bool?> registerHelperDeviceToken(String token, String phone);
 }
 
 class DefaultRepository implements Repository {
@@ -224,5 +226,10 @@ class DefaultRepository implements Repository {
   @override
   Future<void> updateWorkingStatus(String status, String token) {
     return remoteDataSource.updateWorkingStatus(status, token);
+  }
+
+  @override
+  Future<bool?> registerHelperDeviceToken(String token, String phone) async {
+    return await remoteDataSource.registerHelperDeviceToken(token, phone);
   }
 }

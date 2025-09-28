@@ -60,6 +60,11 @@ dependencies:
   shimmer: ^3.0.0
   dropdown_search: ^6.0.2
   web_socket_channel: ^3.0.2
+  # Firebase dependencies
+  firebase_core: ^2.30.0
+  firebase_messaging: ^14.7.10
+  overlay_support: ^2.1.0
+  shared_preferences: ^2.3.2
 
 
 flutter_launcher_icons:

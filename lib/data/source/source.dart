@@ -78,6 +78,8 @@ abstract interface class DataSource {
   Future<List<RequestHelper>?> loadAssignedRequest(String token);
 
   Future<void> updateWorkingStatus(String workingStatus, String token);
+
+  Future<bool?> registerHelperDeviceToken(String deviceToken, String phone);
 }
 
 class RemoteDataSource implements DataSource {
@@ -813,6 +815,38 @@ class RemoteDataSource implements DataSource {
     } catch (e) {
       print('Error updating status: $e');
       return Future.error(e);
+    }
+  }
+
+  @override
+  Future<bool?> registerHelperDeviceToken(String deviceToken, String phone) {
+    final url = 'https://homecareapi.vercel.app/helper-notifications/register';
+    final uri = Uri.parse(url);
+    final headers = {
+      'Content-Type': 'application/json',
+    };
+    final body = jsonEncode({
+      'token': deviceToken,
+      'phone': phone,
+      'platform': 'android'
+    });
+    try {
+      return http.post(uri, headers: headers, body: body).then((response) {
+        if (response.statusCode == 200) {
+          if (kDebugMode) {
+            print('Device token registered successfully!');
+          }
+          return true;
+        } else {
+          print(
+              'Failed to register device token. Status code: ${response.statusCode}');
+          print('Response body: ${response.body}');
+          return false;
+        }
+      });
+    } catch (e) {
+      print('Error registering device token: $e');
+      return Future.value(false);
     }
   }
 }
