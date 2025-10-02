@@ -9,6 +9,7 @@ class FCMService {
   static String? _currentToken;
   static Function(String)? _onTokenReceived;
   static GlobalKey<NavigatorState>? _navigatorKey;
+  static Function? onRequestRefresh;
 
   // Getter để lấy token hiện tại
   static String? get currentToken => _currentToken;
@@ -38,7 +39,7 @@ class FCMService {
     } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
       print('⚠️ Người dùng đã cấp quyền thông báo tạm thời');
     } else {
-      print('❌ Người dùng từ chối quyền thông báo');
+      print('❌ Ngư���i dùng từ chối quyền thông báo');
     }
 
     // Lấy FCM token và lưu trữ
@@ -229,40 +230,15 @@ class FCMService {
               width: 35,
               height: 35,
               fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.notifications,
-                  color: Colors.green.shade600,
-                  size: 24,
-                );
-              },
-            ),
-          ),
-        ),
-        trailing: Container(
-          decoration: BoxDecoration(
-            color: Colors.green.shade600,
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: TextButton(
-            onPressed: () {
-              // Dismiss the notification overlay
-              if (_navigatorKey?.currentContext != null) {
-                OverlaySupportEntry.of(_navigatorKey!.currentContext!)?.dismiss();
-              }
-              _handleDataPayload(message.data);
-            },
-            child: Text(
-              'Xem',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
             ),
           ),
         ),
       );
+    }
+
+    // Trigger refresh callback if set
+    if (onRequestRefresh != null) {
+      onRequestRefresh!();
     }
 
     // Xử lý data payload nếu có
@@ -275,7 +251,7 @@ class FCMService {
   static void handleNotificationTap(RemoteMessage message) {
     print("📬 Người dùng bấm vào thông báo: ${message.notification?.title}");
 
-    // Xử lý navigation hoặc action dựa trên data
+    // Xử lý navigation ho��c action dựa trên data
     if (message.data.isNotEmpty) {
       _handleDataPayload(message.data);
     }

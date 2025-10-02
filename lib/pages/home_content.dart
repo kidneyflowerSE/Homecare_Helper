@@ -8,6 +8,7 @@ import 'dart:async';
 
 import '../data/model/RequestHelper.dart';
 import '../data/repository/repository.dart';
+import '../services/fcm_service.dart';
 
 class HomeContent extends StatefulWidget {
   final Helper helper;
@@ -78,6 +79,9 @@ class _HomeContentState extends State<HomeContent>
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+
+    // Set the FCMService callback to refresh requests
+    FCMService.onRequestRefresh = refreshRequestsOnly;
 
     // Khởi tạo ScrollController cho mỗi tab
     _scrollControllers = List.generate(5, (index) => ScrollController());
@@ -1101,7 +1105,7 @@ class _HomeContentState extends State<HomeContent>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    "Bạn đã có công việc được giao, hoàn thành trước khi nhận việc mới",
+                    "Bạn đã có công vi��c được giao, hoàn thành trước khi nhận việc mới",
                     style: TextStyle(
                       color: Colors.orange[700],
                       fontSize: 12,
@@ -1224,7 +1228,7 @@ class _HomeContentState extends State<HomeContent>
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 const Text(
-                  'Bạn có chắc chắn muốn từ chối công việc này?',
+                  'Bạn có chắc chắn muốn từ chối công việc n��y?',
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -1245,7 +1249,7 @@ class _HomeContentState extends State<HomeContent>
           actions: <Widget>[
             TextButton(
               child: Text(
-                'Hủy',
+                'H��y',
                 style: TextStyle(
                   color: Colors.grey[700],
                 ),
