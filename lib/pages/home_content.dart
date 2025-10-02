@@ -1196,22 +1196,7 @@ class _HomeContentState extends State<HomeContent>
           ),
         );
       case "waitPayment":
-        return ElevatedButton.icon(
-          onPressed: () => finishPayment(request),
-          icon: const Icon(Icons.payments, size: 16),
-          label: const Text(
-            "Xác nhận thanh toán",
-            style: TextStyle(
-              fontFamily: 'Quicksand',
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 48),
-          ),
-        );
+        return const SizedBox.shrink(); // Remove the "Xác nhận thanh toán" button
       default:
         return const SizedBox.shrink();
     }
