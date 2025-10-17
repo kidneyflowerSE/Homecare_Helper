@@ -63,11 +63,6 @@ class _HomeContentState extends State<HomeContent>
       "color": Colors.blue,
       "icon": Icons.hourglass_top,
     },
-    "waitPayment": {
-      "label": "Chờ thanh toán",
-      "color": Colors.orange,
-      "icon": Icons.payments,
-    },
     "completed": {
       "label": "Hoàn thành",
       "color": Colors.green,
@@ -78,13 +73,13 @@ class _HomeContentState extends State<HomeContent>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
 
     // Set the FCMService callback to refresh requests
     FCMService.onRequestRefresh = refreshRequestsOnly;
 
     // Khởi tạo ScrollController cho mỗi tab
-    _scrollControllers = List.generate(5, (index) => ScrollController());
+    _scrollControllers = List.generate(4, (index) => ScrollController());
 
     // Thêm listener cho mỗi scroll controller
     for (int i = 0; i < _scrollControllers.length; i++) {
@@ -179,8 +174,6 @@ class _HomeContentState extends State<HomeContent>
       case 2:
         return "inProgress";
       case 3:
-        return "waitPayment";
-      case 4:
         return "completed";
       default:
         return "pending";
@@ -345,23 +338,9 @@ class _HomeContentState extends State<HomeContent>
     await repository.finishRequest(request.schedules.first.id, widget.token);
     if (mounted) {
       setState(() {
-        request.schedules.first.status = 'waitPayment';
-      });
-      // Switch to wait payment tab
-      _switchToStatusTab('waitPayment');
-      await refreshRequestsOnly();
-    }
-  }
-
-  Future<void> finishPayment(RequestHelper request) async {
-    var repository = DefaultRepository();
-    await repository.remoteDataSource
-        .finishPayment(request.schedules.first.id, widget.token);
-    if (mounted) {
-      setState(() {
         request.schedules.first.status = 'completed';
       });
-      // Switch to done tab
+      // Switch to completed tab
       _switchToStatusTab('completed');
       await refreshRequestsOnly();
     }
@@ -1199,8 +1178,6 @@ class _HomeContentState extends State<HomeContent>
             minimumSize: const Size(double.infinity, 48),
           ),
         );
-      case "waitPayment":
-        return const SizedBox.shrink(); // Remove the "Xác nhận thanh toán" button
       default:
         return const SizedBox.shrink();
     }
